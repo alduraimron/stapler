@@ -21,7 +21,7 @@ menyalin apa pun ke `.pi/skills/`.
 
 ```bash
 cd project-kamu
-pi install -l --approve git:github.com/alduraimron/stapler@v0.1.0
+pi install -l --approve git:github.com/alduraimron/stapler@v0.2.0
 pi
 ```
 
@@ -30,7 +30,7 @@ pi
 - Pi meng-clone paket ke cache-nya (`.pi/git/github.com/alduraimron/stapler/`) dan memuat skill dari sana.
   Skill tetap membaca dan menulis artefak di project kamu (`.pi/plans/`, `.pi/rules.md`, `AGENTS.md`).
 - Ref tag bersifat pinned: `pi update --extensions` tidak memindahkannya ke versi lebih baru. Pindah versi
-  dengan memasang ulang, mis. `pi install -l --approve git:github.com/alduraimron/stapler@v0.1.1`.
+  dengan memasang ulang, mis. `pi install -l --approve git:github.com/alduraimron/stapler@v0.2.1`.
 - Project yang punya `.pi/settings.json` perlu di-trust. Pi menanyakannya saat start; `--approve` pada
   perintah `pi install` hanya berlaku untuk perintah itu sendiri.
 - Cek hasilnya dengan `pi list`. Restart Pi setelah memasang supaya skill dipindai ulang.
