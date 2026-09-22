@@ -10,25 +10,40 @@ project dan dikembangkan sendiri di repo ini.
 | --- | --- |
 | `skills/plan-task/` | Sesi MASTER: baca aturan project, tanya ambiguitas sekaligus, tulis plan. Tidak menulis kode |
 | `skills/implement-task/` | Sesi WORKER: eksekusi satu file plan sampai terverifikasi, lalu lapor |
+| `package.json` | Manifest paket Pi; skill di-expose lewat `pi.skills` |
 | `docs/DECISIONS.md` | Kenapa desainnya begini, alternatif yang ditolak, dan perbandingan dengan `feature-workflow` |
 | `docs/ROADMAP.md` | Rencana perbaikan + statusnya |
 
+## Instalasi (project-local)
+
+Stapler dipasang sebagai paket Pi **per project**, bukan global. Paketnya hanya berisi skill, jadi tidak perlu
+menyalin apa pun ke `.pi/skills/`.
+
+```bash
+cd project-kamu
+pi install -l --approve git:github.com/alduraimron/stapler@v0.1.0
+pi
+```
+
+- `-l` menulis deklarasi paket ke `.pi/settings.json` project itu saja; `~/.pi/agent/settings.json` tidak
+  berubah.
+- Pi meng-clone paket ke cache-nya (`.pi/git/github.com/alduraimron/stapler/`) dan memuat skill dari sana.
+  Skill tetap membaca dan menulis artefak di project kamu (`.pi/plans/`, `.pi/rules.md`, `AGENTS.md`).
+- Ref tag bersifat pinned: `pi update --extensions` tidak memindahkannya ke versi lebih baru. Pindah versi
+  dengan memasang ulang, mis. `pi install -l --approve git:github.com/alduraimron/stapler@v0.1.1`.
+- Project yang punya `.pi/settings.json` perlu di-trust. Pi menanyakannya saat start; `--approve` pada
+  perintah `pi install` hanya berlaku untuk perintah itu sendiri.
+- Cek hasilnya dengan `pi list`. Restart Pi setelah memasang supaya skill dipindai ulang.
+
 ## Cara pakai
 
-1. Pasang skill ke Pi (pilih salah satu):
-   ```bash
-   cp -r skills/plan-task skills/implement-task ~/.pi/agent/skills/
-   # atau symlink
-   ln -s ~/code/pi/stapler/skills/plan-task ~/.pi/agent/skills/plan-task
-   ln -s ~/code/pi/stapler/skills/implement-task ~/.pi/agent/skills/implement-task
-   ```
-2. Restart Pi (skill dipindai saat startup).
-3. Jalankan (keduanya dipicu manual, `disable-model-invocation: true`):
-   ```
-   /skill:plan-task feature <permintaan>
-   /skill:plan-task bugfix <gejala bug>
-   /skill:implement-task .pi/plans/<file>.md
-   ```
+Keduanya dipicu manual (`disable-model-invocation: true`):
+
+```
+/skill:plan-task feature <permintaan>
+/skill:plan-task bugfix <gejala bug>
+/skill:implement-task .pi/plans/<file>.md
+```
 
 Aturan project dibaca dari `AGENTS.md` (aturan tim, tidak boleh diubah) dan `.pi/rules.md` (aturan personal).
 Kalau `.pi/rules.md` belum ada, `plan-task` menawarkan membuatkannya.

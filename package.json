@@ -1,0 +1,14 @@
+{
+  "name": "stapler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spec-driven planning and implementation workflow skills for Pi",
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  }
+}
