@@ -28,6 +28,23 @@ Lokasi: `.pi/plans/<YYYY-MM-DD>-<slug>.md`
 | Topik | Keputusan | Alternatif yang ditolak + alasan |
 | --- | --- | --- |
 
+## Decision records
+
+Keputusan project yang bertahan. Wajib ada di setiap plan; isi `Tidak ada.` kalau memang tidak ada. Cara
+menentukan dan menulisnya ada di [bagian 3](#3-adr-memori-keputusan-project).
+
+### Existing
+- `.pi/adr/<NNNN-slug>.md` - membatasi apa di task ini (bukan sekadar "terkait")
+  (atau `Tidak ada.`)
+
+### Created
+- `.pi/adr/<NNNN-slug>.md` - <keputusan dalam satu baris>
+  (atau `Tidak ada.`)
+
+### Superseded
+- `.pi/adr/<lama>.md` -> `.pi/adr/<baru>.md` - <kenapa berubah>
+  (atau `Tidak ada.`)
+
 ## Pertanyaan terbuka
 - (harus kosong saat sesi master ditutup)
 
@@ -93,6 +110,23 @@ Lokasi: `.pi/plans/<YYYY-MM-DD>-<slug>.md`
 | Alternatif | Alasan ditolak |
 | --- | --- |
 
+## Decision records
+
+Keputusan project yang bertahan. Wajib ada di setiap plan; isi `Tidak ada.` kalau memang tidak ada. Cara
+menentukan dan menulisnya ada di [bagian 3](#3-adr-memori-keputusan-project).
+
+### Existing
+- `.pi/adr/<NNNN-slug>.md` - membatasi apa di task ini (bukan sekadar "terkait")
+  (atau `Tidak ada.`)
+
+### Created
+- `.pi/adr/<NNNN-slug>.md` - <keputusan dalam satu baris>
+  (atau `Tidak ada.`)
+
+### Superseded
+- `.pi/adr/<lama>.md` -> `.pi/adr/<baru>.md` - <kenapa berubah>
+  (atau `Tidak ada.`)
+
 ## Dampak & regression risk
 - Terpengaruh: ...
 - Perlu dicek ulang: ...
@@ -118,41 +152,105 @@ tutup sesi. Jangan mengarang perbaikan.
 
 ---
 
-## 3. Template ADR
+## 3. ADR (memori keputusan project)
 
-Lokasi: ikut `.pi/rules.md` / `AGENTS.md` (mis. `.pi/adr/00NN-<slug>.md`), plus baris baru di index.
+ADR menyimpan **kenapa** sebuah keputusan diambil, alternatif yang ditolak, dan konsekuensi yang diterima.
+Bukan langkah implementasi, bukan backlog, bukan status pekerjaan. Hasil akhirnya: sesi berikutnya bisa
+menjawab "kenapa dulu begini" dari riwayat, bukan menebak dari kode.
+
+Ditulis di sesi `plan-task` setelah keputusan benar-benar disetujui. Sesi `implement-task` hanya membaca dan
+mematuhi.
+
+### 3.1 Lokasi dan nomor
+
+- File: `.pi/adr/NNNN-<slug>.md` - `NNNN` empat digit berurutan (`0001`, `0002`, ...).
+- Nomor berikutnya = nomor tertinggi yang ada + 1. Gap boleh; nomor **tidak pernah** dipakai ulang dan ADR
+  lama **tidak pernah** dinomori ulang.
+- Slug pendek dan deskriptif, huruf kecil, dipisah `-`.
+- Direktori `.pi/adr/` dibuat saat ADR pertama benar-benar perlu ditulis. Jangan dibuat di muka.
+
+### 3.2 Index `.pi/adr/README.md`
+
+Pintu masuk satu-satunya. Sesi berikutnya membaca index ini dulu, lalu membuka hanya ADR yang relevan. Jaga
+supaya tetap ringkas.
 
 ```markdown
-# ADR 00NN: <keputusan dalam satu frasa>
+# Project Decision Records
 
-- **Status**: Diusulkan | Diterima | Ditolak | Selesai (tanggal)
-- **Tanggal**: <YYYY-MM-DD>
-- **Konteks fitur**: <plan terkait>
-- **File terkait**: `<path>`
-
-## Konteks
-<masalah + batasan yang ada saat keputusan diambil>
-
-## Keputusan
-<apa yang dipilih, cukup spesifik>
-
-## Alasan
-<kenapa itu yang dipilih, 2-4 poin>
-
-## Konsekuensi
-**Positif**
-- ...
-
-**Negatif / utang teknis**
-- ...
-
-## Alternatif yang ditolak
-| Alternatif | Alasan ditolak |
-| --- | --- |
-
-## Referensi
-- <standar/plan/commit terkait>
+| ADR | Decision | Topic | Status |
+| --- | --- | --- | --- |
+| [0001](0001-use-uuid-identifiers.md) | Use UUID for domain identifiers | database | Accepted |
+| [0002](0002-standard-api-error-envelope.md) | Standard API error envelope | api | Accepted |
+| [0003](0003-use-rotating-refresh-tokens.md) | Use rotating refresh tokens | authentication | Superseded by [0011](0011-store-refresh-tokens-in-postgresql.md) |
 ```
+
+Status yang dipakai: `Proposed`, `Accepted`, `Rejected`, `Superseded`, `Deprecated`. Jangan pakai
+`Selesai`/`Completed`/`Done`: ADR adalah status keputusan, bukan progres task.
+
+### 3.3 Template file ADR
+
+```markdown
+# ADR NNNN: <keputusan dalam satu frasa>
+
+- **Status:** Proposed | Accepted | Rejected | Superseded | Deprecated
+- **Date:** <YYYY-MM-DD>
+- **Topic:** <topik singkat, mis. authentication>
+- **Related plan:** `<path plan>` atau None
+- **Supersedes:** ADR-NNNN (hanya kalau ada)
+
+## Context
+<masalah, batasan, dan fakta yang diketahui saat keputusan diambil. Jangan ditulis ulang di kemudian hari>
+
+## Decision
+<apa yang diputuskan; cukup konkret sehingga sesi lain bisa menilai apakah perubahan baru bertentangan>
+
+## Rationale
+<kenapa opsi ini dipilih. Sebab-akibat, bukan manfaat generik>
+
+## Alternatives considered
+
+### <alternatif>
+<kenapa tidak dipilih. Alternatif tidak harus buruk, cukup tidak dipilih>
+
+## Consequences
+
+### Positive
+- ...
+
+### Negative / trade-offs
+- ...
+
+## History
+- <YYYY-MM-DD> - Decision accepted.
+
+## Corrections
+None.
+```
+
+Kalau project sudah punya ADR dengan judul section lain, ikuti yang sudah ada. Isi ADR ditulis dalam bahasa
+project/user, jangan dipaksa mengikuti bahasa dokumentasi Stapler.
+
+### 3.4 Riwayat bersifat append (jangan menulis ulang sejarah)
+
+| Yang terjadi | Yang dilakukan |
+| --- | --- |
+| Ada informasi tambahan, keputusan tidak berubah | tambah baris di `## History` |
+| Fakta di ADR lama ternyata salah | tambah entri bertanggal di `## Corrections`; klaim lama **tetap ada** |
+| Keputusan yang bertahan berubah | buat ADR baru + tandai ADR lama `Superseded by ADR-NNNN` |
+
+Contoh `## Corrections`:
+
+```markdown
+## Corrections
+
+### 2026-10-14
+
+Konteks awal menyebut `users.institution` tidak terpakai. Penelusuran lanjutan menemukan field itu diakses
+lewat `InstitutionRepository`. Koreksi ini tidak mengubah keputusan.
+```
+
+Sebutkan bukti yang mengubah pemahaman dan apakah keputusannya ikut berubah. Jangan mengubah paragraf lama
+menjadi sesuatu yang tidak diketahui saat itu.
 
 ---
 
@@ -169,7 +267,7 @@ Prioritas: file ini menang untuk **workflow**; `AGENTS.md` + `docs/standards/` m
 
 ## Artefak
 - Plan: `.pi/plans/<YYYY-MM-DD>-<slug>.md`
-- ADR: `.pi/adr/` (index di `README.md`)
+- ADR: `.pi/adr/NNNN-<slug>.md` (index di `.pi/adr/README.md`)
 - Desain: `.pi/design/<fitur>/*.png`
 
 ## Perintah verifikasi wajib sebelum commit
@@ -181,7 +279,7 @@ Prioritas: file ini menang untuk **workflow**; `AGENTS.md` + `docs/standards/` m
 - tidak menyentuh modul di luar scope plan tanpa izin
 
 ## Bahan wajib dibaca per jenis tugas
-- Selalu: `AGENTS.md`, `.pi/rules.md`
+- Selalu: `AGENTS.md`, `.pi/rules.md`, index ADR `.pi/adr/README.md` (kalau ada; ADR dibuka hanya yang relevan)
 - UI/desain: `.pi/design/<fitur>/*.png` (dibaca di sesi plan, hasilnya ditranskrip ke plan)
 - Backend: `docs/standards/backend-architecture.md`
 - Perubahan skema: `prisma/schema.prisma`

@@ -48,6 +48,35 @@ Keduanya dipicu manual (`disable-model-invocation: true`):
 Aturan project dibaca dari `AGENTS.md` (aturan tim, tidak boleh diubah) dan `.pi/rules.md` (aturan personal).
 Kalau `.pi/rules.md` belum ada, `plan-task` menawarkan membuatkannya.
 
+## Artefak di project
+
+| Path | Isi |
+| --- | --- |
+| `.pi/plans/` | Plan task: apa yang dikerjakan, langkah, acceptance, perintah verifikasi |
+| `.pi/adr/` | Keputusan project yang bertahan: **kenapa** dipilih, alternatif yang ditolak, konsekuensinya |
+
+ADR opsional dan tidak dibuat di muka: direktori `.pi/adr/` muncul saat keputusan pertama yang benar-benar
+bertahan perlu dicatat. Yang dibaca lebih dulu selalu index `.pi/adr/README.md` (tabel nomor, keputusan,
+topik, status), lalu hanya ADR yang relevan dengan task - bukan seluruh direktori.
+
+Aturan singkatnya:
+
+- ADR menyimpan **why**, bukan langkah implementasi. Rename fungsi, tambah test, atau satu endpoint tidak
+  perlu ADR. Kalau masih perlu diketahui setelah task selesai, itu layak jadi ADR.
+- ADR ditulis di sesi `plan-task` setelah keputusannya benar-benar disetujui, bukan dari opsi yang cuma
+  sempat dipertimbangkan model.
+- Riwayat bersifat append: informasi baru ditambah di `History`, fakta lama yang ternyata salah ditambah di
+  `Corrections` (klaim lama tetap ada), dan keputusan yang berubah dibuatkan ADR baru yang men-`Supersede`
+  ADR lama. Sejarah tidak pernah ditulis ulang.
+- Status ADR adalah status keputusan (`Proposed`, `Accepted`, `Rejected`, `Superseded`, `Deprecated`), bukan
+  progres task.
+- `implement-task` membaca dan mematuhi ADR yang disebut plan. Kalau implementasi butuh menyimpang dari ADR
+  `Accepted`, sesi itu berhenti dan meminta revisi plan, bukan memutuskan sendiri.
+- Bahasa ADR mengikuti project yang memakainya, bukan bahasa dokumentasi Stapler.
+
+Format plan, ADR, dan index-nya ada di
+[`skills/plan-task/references/plan-format.md`](skills/plan-task/references/plan-format.md).
+
 ## Hubungan dengan `feature-workflow`
 
 `feature-workflow` (di `~/.pi/agent/skills/`) lebih lengkap: ada gerbang berbasis script, lifecycle status satu

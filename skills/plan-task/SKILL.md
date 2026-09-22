@@ -18,7 +18,8 @@ baris. Kalau tetap tidak jelas: tanya.
 
 1. `AGENTS.md` - aturan tim. **Baca saja, jangan pernah mengubahnya.**
 2. `.pi/rules.md` - aturan personal (workflow, lokasi artefak, perintah verifikasi, larangan).
-3. `.pi/adr/README.md` kalau ada - untuk tahu ADR mana yang relevan.
+3. `.pi/adr/README.md` kalau ada - index keputusan project. Baca **index-nya dulu**, lalu buka hanya ADR
+   yang relevan dengan task ini (lihat bagian 7).
 
 Aturan prioritas:
 
@@ -65,30 +66,84 @@ Wajib ada, berurutan:
 - Jangan bertanya satu-satu, jangan berasumsi pada hal yang mengubah hasil.
 - Jawaban user masuk ke bagian "Keputusan" di plan. Bagian "Pertanyaan terbuka" harus **kosong** saat sesi
   ditutup.
+- Kalau arah yang diminta bertentangan dengan ADR `Accepted`, itu **wajib** masuk batch ini (bagian 7.4).
 
 ## 6. Tulis plan
 
 - Lokasi: ikut `.pi/rules.md`. Kalau tidak didefinisikan, pakai `.pi/plans/<YYYY-MM-DD>-<slug>.md`.
 - Struktur: [references/plan-format.md](references/plan-format.md).
-- Wajib memuat: ruang lingkup, file yang disentuh, acceptance criteria, perintah verifikasi, dan daftar di
-  luar scope.
-- Plan tanpa langkah + acceptance + perintah verifikasi = **belum selesai**. Jangan menutup sesi master
-  sebelum itu ada.
+- Wajib memuat: ruang lingkup, file yang disentuh, acceptance criteria, perintah verifikasi, **Decision
+  records**, dan daftar di luar scope.
+- Plan tanpa langkah + acceptance + perintah verifikasi + Decision records = **belum selesai**. Jangan
+  menutup sesi master sebelum itu ada.
 
-## 7. ADR
+## 7. ADR: memori keputusan project
 
-Tulis/perbarui ADR kalau ada keputusan yang bertahan: arsitektur, kebijakan, deviasi standar, atau
-alternatif penting yang ditolak. Lokasi dan index ikut `.pi/rules.md` atau `AGENTS.md`. Kalau project tidak
-punya mekanisme ADR, keputusan cukup ditulis di plan.
+Tujuan ADR: sesi berikutnya bisa menjawab "kenapa dulu memilih ini dan kenapa alternatif lain ditolak"
+tanpa menebak dari kode. ADR **bukan** daftar tugas, backlog, atau progres.
 
-Waktu menulis ADR:
-- **Sesi master (sekarang):** saat keputusan diambil, status `Diusulkan` atau `Diterima`.
-- **Sesi implement (nanti):** hanya memperbarui status + catatan implementasi. Kalau worker menemukan
-  keputusan baru yang layak jadi ADR, dia berhenti dan tanya.
+Kepemilikan: sesi ini (master) yang **menemukan, mendiskusikan, dan mencatat** keputusan. Sesi implement
+hanya **membaca dan mematuhi**; kalau implementasi butuh menyimpang, worker berhenti dan kembali ke sesi ini.
+
+### 7.1 Baca yang sudah ada (index dulu, jangan boros)
+
+1. Kalau `.pi/adr/README.md` tidak ada: lanjut seperti biasa. Project tanpa ADR itu normal.
+2. Kalau ada: baca **hanya index-nya**. Dari kolom Decision/Topic, tentukan ADR yang mungkin menyentuh
+   task ini.
+3. Buka hanya ADR yang lolos uji relevansi: **apakah ADR ini membatasi atau mengubah cara task ini
+   dikerjakan?** Kalau tidak, jangan dibuka dan jangan dicantumkan di plan.
+4. Jangan membaca beberapa ADR sekaligus dalam satu perintah (`cat .pi/adr/*.md`, `cat a.md b.md`, atau
+   dump satu direktori). Satu file per pembacaan, hanya yang relevan.
+5. `Accepted` = keputusan project yang berlaku. `Proposed` = belum final. `Superseded`/`Deprecated` = jangan
+   dipakai sebagai dasar keputusan baru; sebutkan kalau task ini menggantikannya.
+
+### 7.2 Kapan keputusan layak jadi ADR
+
+Pertanyaan penentunya: **apakah ini masih perlu diketahui setelah task ini selesai?**
+
+Layak: strategi auth/sesi, konvensi identifier (UUID vs sekuensial), strategi penyimpanan, konvensi
+versioning API, konvensi penamaan lintas modul, batas antar-service, arah dependensi, format error response,
+arsitektur deployment, kebijakan keamanan, deviasi sengaja dari standar, konvensi project-wide, trade-off
+teknis yang disengaja, aturan produk yang nanti bisa "diperbaiki" orang lain karena terlihat seperti bug.
+
+Tidak layak: rename fungsi, tambah unit test, bikin migrasi, satu endpoint, pindah helper, perbaikan typo,
+refactor lokal, langkah task, acceptance criteria, perintah verifikasi. Itu milik plan atau kode.
+
+Jangan membuat ADR secara mekanis. Kalau ragu: tanya user satu baris di batch pertanyaan.
+
+### 7.3 Baru dicatat setelah keputusan benar-benar diambil
+
+Opsi yang cuma sempat dipertimbangkan model **bukan** ADR. Tunggu sampai user menyetujui arahnya, baru tulis.
+Alternatif yang ditolak boleh masuk bagian "Alternatives considered" di ADR, tapi eksplorasi saja tidak
+menciptakan ADR.
+
+### 7.4 Kalau task bertentangan dengan ADR `Accepted`
+
+Jangan menimpa diam-diam. Angkat di batch pertanyaan: sebut ADR-nya, apa yang diminta task, dan apa yang
+akan berubah. Kalau arah baru disetujui: buat ADR baru yang menjelaskan kenapa konteks/requirement berubah,
+lalu tandai ADR lama `Superseded by ADR-NNNN`. ADR lama **tidak** ditulis ulang.
+
+### 7.5 Menulis dan memperbarui
+
+- Lokasi, nomor, index, dan struktur file: [references/plan-format.md](references/plan-format.md) bagian 3.
+- Setiap ADR baru **wajib** ditambahkan ke `.pi/adr/README.md`.
+- Bahasa: ikuti bahasa ADR yang sudah ada di project. Kalau belum ada, ikuti bahasa dominan artefak project
+  dan diskusi dengan user. Jangan memaksa bahasa dokumentasi Stapler.
+- Status ADR adalah status keputusan (`Proposed`, `Accepted`, `Rejected`, `Superseded`, `Deprecated`), bukan
+  progres task. Jangan memakai `Selesai`/`Completed`/`Done`.
+
+Tiga mekanisme riwayat - jangan pernah menulis ulang sejarah:
+
+| Yang terjadi | Yang dilakukan |
+| --- | --- |
+| Ada informasi tambahan, keputusan tidak berubah | tambah baris di `## History` |
+| Fakta di ADR lama ternyata salah | tambah entri bertanggal di `## Corrections`; klaim lama tetap ada |
+| Keputusan yang bertahan berubah | buat ADR baru + `Superseded by ADR-NNNN` di ADR lama |
 
 ## 8. Tutup sesi
 
-Keluarkan ringkas: (1) path plan, (2) 3-6 baris ringkasan keputusan, (3) blok kickoff siap tempel:
+Keluarkan ringkas: (1) path plan, (2) 3-6 baris ringkasan keputusan, (3) ADR yang dibuat/digantikan (atau
+"tidak ada"), (4) blok kickoff siap tempel:
 
 ```
 /skill:implement-task .pi/plans/<file>.md

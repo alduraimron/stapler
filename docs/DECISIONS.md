@@ -14,7 +14,7 @@ Tabel: keputusan desain, statusnya di `feature-workflow`, dan catatan.
 | D4 | Artefak disimpan di project, bukan di folder skill | **Ada, beda bentuk** | `feature-workflow`: satu `.pi/workflow/current-work.md` (satu work item aktif + arsip `history/`). Stapler: plan bertanggal di `.pi/plans/` |
 | D5 | Aturan personal dipisah dari aturan tim (`AGENTS.md`) dan prioritasnya eksplisit | **Belum ada** | Kandidat perbaikan: file config personal (usulan `.pi/rules.md`) yang dibaca semua command |
 | D6 | Aset desain dibaca di sesi master lalu ditranskrip ke plan | **Belum ada** | Tidak ada instruksi soal gambar/PNG. Kandidat: langkah + field `## Design references` di template spec |
-| D7 | ADR ditulis di sesi master, status diperbarui di sesi worker | **Belum ada** | `feature-workflow` tidak mengenal ADR. Kandidat: field "ADR terkait" + langkah update status |
+| D7 | ADR sebagai memori keputusan project: `plan-task` yang membuat, mengoreksi, men-`Supersede`, dan memperbarui index; `implement-task` hanya membaca, mematuhi, dan boleh menambah `History` yang tidak mengubah keputusan | **Belum ada** | `feature-workflow` tidak mengenal ADR. Di stapler: `.pi/adr/NNNN-<slug>.md` + index `.pi/adr/README.md`, dibuat saat keputusan pertama perlu dicatat. Worker yang butuh mengubah keputusan berhenti dan minta revisi plan, bukan memutuskan sendiri |
 | D8 | Perubahan kecil tidak lewat sistem; `implement` wajib punya plan | **Ada** | `workflow-implement` menolak tanpa spec yang di-approve |
 | D9 | Larangan: `db:push`/commit/push oleh user, tidak menyentuh `AGENTS.md`, tanpa force push | **Ada, lebih ketat** | `feature-workflow` juga menolak branch protected, dependency/manifest, docs, CI, dan operasi git apa pun kecuali commit final |
 

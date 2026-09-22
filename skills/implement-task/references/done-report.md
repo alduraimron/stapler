@@ -22,6 +22,14 @@ disimpan.
 ## Deviasi dari plan
 - <poin yang berbeda dari plan + alasannya> (tulis "tidak ada" kalau memang tidak ada)
 
+## Keputusan (ADR)
+| ADR | Aksi |
+| --- | --- |
+| `.pi/adr/<file>.md` | dibaca; tidak diubah / `## History` ditambah 1 baris bertanggal |
+
+Tulis `Tidak ada.` kalau plan tidak menyentuh ADR. Kalau implementasi butuh menyimpang dari ADR `Accepted`,
+jangan dicatat di sini: hentikan pekerjaan dan laporkan konflik (lihat `SKILL.md` bagian 4).
+
 ## Temuan di luar scope (tidak dikerjakan)
 - `path:baris` - <masalah, dampak, ukuran>
 
@@ -42,3 +50,6 @@ Aturan laporan:
 4. **Sertakan angka baseline kalau relevan.** Misal skor audit tool atau jumlah isu repo, supaya jelas mana
    isu baru dari pekerjaan ini dan mana yang sudah ada sebelumnya.
 5. **Saran commit maksimal 1 baris** (mengikuti standar project), tanpa menambahkan co-author.
+6. **Konflik keputusan tidak diselesaikan diam-diam.** Kalau implementasi butuh melanggar atau mengganti ADR
+   `Accepted`, hentikan pekerjaan dan laporkan; jangan membuat ADR baru, `Corrections`, atau `Supersede`
+   sendiri. Yang boleh hanya menambah `## History` yang tidak mengubah keputusan.
