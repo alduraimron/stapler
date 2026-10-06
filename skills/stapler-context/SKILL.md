@@ -91,6 +91,8 @@ disalin, hanya dicatat keberadaannya dan hash-nya.
 | `index.md` | MANUAL | 25 baris |
 | `manifest.json` | MANUAL | - |
 | `verification.mjs` | MANUAL | - |
+| `check.mjs` | MANUAL | - |
+| `provenance.mjs` | MANUAL | - |
 | `plays/*.md` | MANUAL | 40 sampai 120 baris |
 | `rules.md` | GENERATED | 80 baris |
 | `deviations.md` | GENERATED | 40 baris |

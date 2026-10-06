@@ -23,14 +23,14 @@ Tidak dipakai untuk: pertanyaan atau riset yang tidak mengubah file, pekerjaan y
 
 ## Langkah 0: pastikan pack siap (fail closed)
 
-1. Baca `.pi/stapler/index.md`, `manifest.json`, `rules.md`, dan `deviations.md`.
-2. Jalankan pemeriksaan kebasian: skill `stapler-context` mode `check`. Kalau skill itu tidak tersedia,
-   lakukan versi minimalnya secara manual: bandingkan hash sumber di `provenance.json` dengan isi file
-   sekarang, dan pastikan semua path yang dirujuk pack masih ada.
+1. `node .pi/stapler/check.mjs`. Ini bagian mekanis: hash sumber, file kelas A, path yang dirujuk, index ADR, dan kesegaran baseline.
+2. Baca `.pi/stapler/index.md`, `manifest.json`, `rules.md`, dan `deviations.md`.
 3. Hasilnya menentukan:
-   - Bersih: lanjut ke langkah 1.
-   - Bası atau belum ada pack: **berhenti mengimplementasi**. Yang boleh hanya recon dan laporan pra-ACC
-     dengan satu baris berisi temuan dan perintah yang perlu dijalankan user.
+   - Exit 0 (hanya OK dan WARN): lanjut ke langkah 1. Catatan WARN dibawa ke laporan.
+   - Exit 1 (ada STALE, HARNESS-CHANGED, MISS, atau DEVIATION-STALE): **berhenti mengimplementasi**. Yang boleh hanya recon dan laporan pra-ACC dengan satu baris berisi temuan dan perintah yang perlu dijalankan user (`stapler-context refresh`, atau perbaikan yang diminta temuan itu).
+   - Pack belum ada: sama, berhenti dan minta `stapler-context init`.
+
+Kalau skrip itu tidak tersedia (pack dari versi lama), lakukan versi minimalnya secara manual: bandingkan hash sumber di `provenance.json` dengan isi file sekarang, dan pastikan semua path yang dirujuk pack masih ada.
 
 ## Empat kelas pembacaan
 

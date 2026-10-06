@@ -5,7 +5,7 @@ semuanya.
 
 ## 1. Tentukan yang berubah
 
-1. Jalankan `check` dulu, atau langsung bandingkan hash di `provenance.json` dengan isi sumber sekarang.
+1. Jalankan `node .pi/stapler/check.mjs` dulu, atau langsung bandingkan hash di `provenance.json` dengan isi sumber sekarang.
 2. Kelompokkan temuan:
    - Sumber yang isinya berubah: perlu dikompilasi ulang.
    - File kelas A yang berubah: tidak dikompilasi, hanya perbarui hash dan nilai `watched`.
@@ -33,12 +33,12 @@ sebutkan di ringkasan, tapi tidak perlu menunggu keputusan.
    yang diusulkan dan biarkan user yang mengubah, atau minta izin eksplisit lebih dulu.
 3. Perbarui `deviations.md` kalau ada deviasi yang dicabut atau ditambah. Setiap perubahan deviasi butuh
    keputusan user, bukan kesimpulan sendiri.
-4. Perbarui `provenance.json`: hash baru, waktu kompilasi baru, dan HEAD terbaru.
+4. Perbarui `provenance.json` dengan menjalankan `node .pi/stapler/provenance.mjs`, jangan menghitung hash secara manual. `compiledInto` yang sudah ada akan dipertahankan.
 5. Perbarui angka terukur lewat verifier `--refresh-baseline`, jangan menulis angka baseline secara manual.
 
 ## 4. Verifikasi
 
-1. Jalankan `check` lagi. Harus bersih dari `STALE`, `MISS`, dan `DEVIATION-STALE`.
+1. Jalankan `node .pi/stapler/check.mjs` lagi. Harus bersih dari `STALE`, `MISS`, dan `DEVIATION-STALE`.
 2. Kalau masih ada `WARN`, jelaskan artinya, jangan diamkan.
 3. Laporkan: file yang berubah, aturan yang berubah, deviasi yang berubah, dan sisa temuan.
 

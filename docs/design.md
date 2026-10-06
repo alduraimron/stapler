@@ -113,6 +113,8 @@ standar:
 |- index.md            MANUAL    pintu masuk, 20 baris: isi pack + baca apa untuk apa
 |- manifest.json       MANUAL    sumber, override, perintah, scope, lint baseline
 |- verification.mjs    MANUAL    verifier project, kontrak CLI tetap
+|- check.mjs           MANUAL    pemeriksa kebasian pack, kontrak CLI tetap
+|- provenance.mjs      MANUAL    penulis provenance, jangan hitung hash secara manual
 |- plays/              MANUAL    konvensi kerja khas project
 |- provenance.json     GENERATED hash sumber, HEAD, waktu kompilasi
 |- rules.md            GENERATED aturan mengikat, satu butir satu baris, ada anotasi sumber
@@ -249,6 +251,14 @@ Aturan:
 | Dokumen/aturan  | isi sumber berubah                   | hash isi file             |
 | Fakta dari kode | kode berubah walau dokumen tetap     | HEAD dan pengukuran ulang |
 
+Untuk sumber berupa direktori, hash menghitung nama **dan isi** tiap file di dalamnya, supaya perubahan isi
+di dalam folder (mis. satu berkas ADR atau satu dokumen di `docs/`) ikut terdeteksi. Menghitung daftar nama
+saja tidak cukup, dan itu pernah membuat perubahan dokumen lolos pemeriksaan.
+
+Bagian mekanis pemeriksaan ini dijalankan satu skrip: `node .pi/stapler/check.mjs`. Skripnya memeriksa hash
+sumber, file kelas A, path yang dirujuk pack, integritas index ADR, dan kesegaran HEAD serta baseline.
+Interpretasi dampak dan keputusan refresh tetap dikerjakan agent lewat skill `stapler-context` mode `check`.
+
 Temuan `check`:
 
 | Kode              | Arti                                                        | Tindakan  |
@@ -318,6 +328,22 @@ teks stylish. Untuk linter lain, dua jalur yang disarankan:
 
 Konsekuensinya harus dinyatakan jujur di laporan `init`: selama parser masih `exit-only`, klaim "tidak ada
 regresi lint" tidak bisa dibuktikan, dan itu ditulis sebagai batasan, bukan sebagai hijau.
+
+### Skrip lain di pack
+
+| Skrip | Kontrak |
+| --- | --- |
+| `check.mjs` | `node .pi/stapler/check.mjs [--json]`. Read-only, aman dijalankan sesering apa pun. Exit 0 kalau hanya `OK` dan `WARN`, exit 1 kalau ada `STALE`, `HARNESS-CHANGED`, `MISS`, atau `DEVIATION-STALE`. Dipanggil di langkah 0 `stapler` dan setiap habis pull |
+| `provenance.mjs` | `node .pi/stapler/provenance.mjs [--print] [--generated-by "<nama@versi>"]`. Menulis ulang `provenance.json` dari `manifest.json` dan mempertahankan `compiledInto` yang sudah ada. Hash tidak pernah dihitung manual |
+
+Alur khas setelah pull:
+
+```bash
+node .pi/stapler/check.mjs        # sumber aturan berubah? baseline ketinggalan? prasyarat pull?
+# ada STALE pada sumber aturan  -> stapler-context refresh
+# ada MISS yang menyentuh pack  -> perbaiki di pack, atau minta user memperbaiki sumbernya
+node .pi/stapler/verification.mjs --scope "<file task>"   # sebelum commit
+```
 
 ## 14. Play
 

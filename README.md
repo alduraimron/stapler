@@ -46,12 +46,22 @@ memakai skill pertama yang ditemukan saat namanya bertabrakan.
 /skill:stapler <mode>             # kerjakan task
 ```
 
+Setelah pull, dua perintah ini yang paling sering dipakai:
+
+```bash
+node .pi/stapler/check.mjs        # ada STALE, HARNESS-CHANGED, MISS, atau baseline ketinggalan?
+node .pi/stapler/verification.mjs --scope "<file yang berubah>"   # sebelum commit
+```
+
+`check.mjs` juga mengingatkan prasyarat pasca-pull: `npm install` bila `package.json` berubah, dan
+`npm run db:generate` plus sinkronisasi DB bila schema berubah.
+
 ## Isi paket
 
 ```text
 skills/stapler/            alur kerja + mode proses (feature, bugfix, refactor, integration)
 skills/stapler-context/    compiler + mode (init, check, refresh)
-templates/pack/            kerangka context pack: manifest, rules, deviations, verifier
+templates/pack/            kerangka context pack: manifest, rules, deviations, verifier, check, provenance
 templates/plays/           kerangka konvensi kerja khas project yang disalin ke pack
 templates/tasks/           kerangka laporan pra-ACC dan artefak run
 prompts/stapler-kickoff.md prompt mulai sesi (nama sengaja diberi awalan `stapler-` supaya tidak bertabrakan dengan prompt project bernama `kickoff`)

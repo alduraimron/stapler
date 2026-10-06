@@ -48,17 +48,20 @@ Urutan penulisan:
 1. `manifest.json` dari template, diisi hasil wawancara.
 2. `verification.mjs` dari template yang paling dekat dengan stack. Sesuaikan hanya bagian yang memang khas
    project (mis. `cleanupPaths`), jangan ubah kontrak CLI.
-3. `rules.md`: larangan, gate, aturan komentar, dan batas scope. Verbatim untuk butir dan perintah.
-4. `deviations.md` dari wawancara. Baris safety floor ikut dicetak di bawah tabel.
-5. `standards/<topik>.md`: saring standar tim per topik. Sertakan `path:baris` pada butir yang penting.
-6. `architecture.md`: urutan lapisan, batas antar lapisan, dan 1 sampai 3 contoh emas dengan `path:baris`.
-7. `domain.md`: entitas penting, angka turunan beserta definisinya, gate akses, dan konvensi data.
-8. `adr-index.md`: topik ke file ADR. Sekalian laporkan ADR yang tidak terdaftar di indeks sebagai `MISS`.
-9. `design.md`: aturan membaca aset desain dan penunjuk foldernya. Jangan menyalin gambar.
-10. `plays/*.md` dari template, diisi ringkas sesuai recon. Tandai bagian yang belum diputuskan user sebagai
+3. `check.mjs` dan `provenance.mjs` dari template, apa adanya. Keduanya tidak perlu disesuaikan.
+4. `rules.md`: larangan, gate, aturan komentar, dan batas scope. Verbatim untuk butir dan perintah.
+5. `deviations.md` dari wawancara. Baris safety floor ikut dicetak di bawah tabel.
+6. `standards/<topik>.md`: saring standar tim per topik. Sertakan `path:baris` pada butir yang penting.
+7. `architecture.md`: urutan lapisan, batas antar lapisan, dan 1 sampai 3 contoh emas dengan `path:baris`.
+8. `domain.md`: entitas penting, angka turunan beserta definisinya, gate akses, dan konvensi data.
+9. `adr-index.md`: topik ke file ADR. Sekalian laporkan ADR yang tidak terdaftar di indeks sebagai `MISS`.
+10. `design.md`: aturan membaca aset desain dan penunjuk foldernya. Jangan menyalin gambar.
+11. `plays/*.md` dari template, diisi ringkas sesuai recon. Tandai bagian yang belum diputuskan user sebagai
     pertanyaan terbuka, bukan dikarang.
-11. `index.md`: pintu masuk. Isinya: apa itu pack ini, urutan baca untuk tiap jenis task, dan daftar play.
-12. `provenance.json`: hash semua sumber yang dikompilasi, hash file kelas A yang diawasi, HEAD, waktu.
+12. `index.md`: pintu masuk. Isinya: apa itu pack ini, urutan baca untuk tiap jenis task, dan daftar play.
+13. Isi `compiledInto` untuk tiap sumber (file pack mana yang dipengaruhi sumber itu) di `provenance.json`,
+    lalu tulis ulang dengan `node .pi/stapler/provenance.mjs --generated-by "stapler-context@<versi>"`.
+    Jangan menghitung hash secara manual.
 
 Setiap file GENERATED diawali banner: pembuat, versi skill, waktu, dan daftar sumber.
 
@@ -75,7 +78,7 @@ Gate build dijalankan hanya kalau user setuju, karena lambat.
 
 ## 6. Verifikasi hasil
 
-1. Jalankan `check` sampai bersih, kecuali temuan yang memang belum bisa ditutup. Sisa temuan dilaporkan.
+1. Jalankan `node .pi/stapler/check.mjs` sampai bersih, kecuali temuan yang memang belum bisa ditutup. Sisa temuan dilaporkan.
 2. Jalankan verifier sekali dengan `--scope` kosong untuk memastikan kontraknya jalan, dan laporkan exit
    code-nya.
 3. Uji negatif yang murah: pastikan gate `scope` benar-benar bisa gagal. Cara aman: jalankan verifier dengan
