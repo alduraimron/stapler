@@ -1,5 +1,13 @@
 # Keputusan: Desain Alur Plan lalu Implement
 
+> **Status: historis.** Desain yang didokumentasikan di sini dihapus dari `main` pada `v0.3.0` dan digantikan
+desain context pack (`docs/design.md`, `docs/PROPOSAL-context-pack.md`). Skill `plan-task` dan
+`implement-task` sudah tidak ada. Dokumen ini tetap disimpan sebagai catatan alasan dan perbandingan dengan
+`feature-workflow`, dan versi kodenya bisa dibaca lewat tag `v0.2.0` atau branch `legacy/plan-implement`.
+> Beberapa keputusan di bawah masih berlaku sebagai prinsip, khususnya D3 (dipicu manual), D5 (aturan
+personal dipisah dari aturan tim, kini diwujudkan sebagai `sources[].role` dan `deviations.md`), D6
+(transkrip aset desain), D7 (ADR sebagai memori keputusan), dan D9 (larangan operasi git oleh agent).
+
 Konteks: sesi 2026-09-14/15 (di project e-Kerjasama Blitar). Ide awalnya memisahkan sesi diskusi (master)
 dari sesi eksekusi (worker) supaya context tidak terpakai dua kali. Setelah dibuat, ditemukan sistem
 `feature-workflow` yang sudah ada dan lebih lengkap, sehingga versi ini dijadikan versi ringan/referensi.
