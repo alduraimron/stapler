@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "projectName": "<isi saat init>",
+  "stack": "generic",
+  "rawReads": "index-only",
+  "precedence": ["safety-floor", "harness-injected", "pack", "indexed-raw", "general-practice"],
+  "commands": {
+    "format": "npx prettier --check",
+    "typecheck": "npx tsc --noEmit",
+    "lint": "npm run lint",
+    "test": null,
+    "build": "npm run build"
+  },
+  "cleanupPaths": [],
+  "format": {
+    "ignore": [".pi/**"],
+    "headProbe": "npx prettier --stdin-filepath"
+  },
+  "lint": {
+    "parser": "auto",
+    "baseline": {
+      "errors": null,
+      "warnings": null,
+      "files": {},
+      "measuredAt": null,
+      "head": null
+    },
+    "ignoreFiles": []
+  },
+  "scope": {
+    "paths": [],
+    "always": [".pi/**", ".stapler/**", "AGENTS.md"]
+  },
+  "sources": [],
+  "harnessInjected": [
+    { "path": "~/.pi/agent/AGENTS.md", "scope": "global" },
+    { "path": "AGENTS.md", "scope": "project" }
+  ],
+  "pack": {
+    "index": ".pi/stapler/index.md",
+    "rules": ".pi/stapler/rules.md",
+    "deviations": ".pi/stapler/deviations.md",
+    "standards": ".pi/stapler/standards",
+    "plays": ".pi/stapler/plays",
+    "runs": ".pi/stapler/runs"
+  }
+}
