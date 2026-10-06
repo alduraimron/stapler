@@ -197,7 +197,7 @@ function main() {
       const changed = git(["diff", "--name-only", `${baseline.head}..HEAD`]);
       const files = changed.ok ? changed.out.split("\n").filter(Boolean) : [];
       notes.push(`baseline diukur di HEAD ${baseline.head}, sekarang ${current} (${files.length} file berubah)`);
-      drill.push("node .pi/stapler/verification.mjs --refresh-baseline --scope-from .pi/stapler/runs/<run terakhir>.json");
+      drill.push("node .pi/stapler/verification.mjs --refresh-baseline");
       if (files.some((file) => /^package(-lock)?\.json$/.test(file))) {
         notes.push("package.json berubah: jalankan npm install");
         drill.push("npm install");
