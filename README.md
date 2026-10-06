@@ -54,7 +54,7 @@ skills/stapler-context/    compiler + mode (init, check, refresh)
 templates/pack/            kerangka context pack: manifest, rules, deviations, verifier
 templates/plays/           kerangka konvensi kerja khas project yang disalin ke pack
 templates/tasks/           kerangka laporan pra-ACC dan artefak run
-prompts/kickoff.md         prompt mulai sesi
+prompts/stapler-kickoff.md prompt mulai sesi (nama sengaja diberi awalan `stapler-` supaya tidak bertabrakan dengan prompt project bernama `kickoff`)
 docs/design.md             kontrak desain: istilah, precedence, struktur pack, kontrak verifier
 ```
 

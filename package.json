@@ -1,6 +1,6 @@
 {
   "name": "stapler",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "type": "module",
   "description": "Alur kerja engineering yang dijaga gerbang ACC untuk agent, plus compiler yang mengubah sumber project menjadi satu context pack di .pi/stapler.",

@@ -196,6 +196,8 @@ Catatan field:
 - `lint.parser`: cara membaca keluaran linter. `auto` (default) mencoba JSON lalu teks stylish; pilihan lain
   `eslint-json`, `eslint-stylish`, `exit-only`, dan `custom`. `exit-only` tidak bisa mendeteksi regresi per
   file, jadi hasilnya hanya `pass` atau `warn`, tidak pernah `fail` karena isi.
+- `lint.ignoreFiles`: path yang dibuang dari perbandingan per file, default `.pi/**`. Berguna karena linter
+  sering ikut memeriksa artefak workflow atau clone paket yang berada di dalam project.
 - `lint.parserPath`: dipakai saat `lint.parser` bernilai `custom`. Modulnya wajib punya default export
   `(output, ctx) => { errors, warnings, files }` atau `null` kalau keluarannya tidak bisa dibaca.
   `ctx.root` adalah akar project dan `ctx.relative(path)` mengubah path absolut menjadi relatif akar.
@@ -291,7 +293,8 @@ Aturan gate:
    tidak ada dasar untuk menyebutnya regresi.
 4. Error di file yang sudah pernah gagal sebelum perubahan dilaporkan sebagai `warn`, bukan `fail`.
 5. Gate yang `null` di manifest dilaporkan `skip` beserta alasannya.
-6. `--refresh-baseline` hanya menulis `verification.json`, tidak pernah menggagalkan gate.
+6. `--refresh-baseline` hanya menulis `verification.json`, tidak pernah menggagalkan gate. Baseline **tidak**
+   ditulis kalau hasil linter tidak terbaca, karena baseline berisi nol akan menyesatkan pemeriksaan berikutnya.
 7. Gate `format` melewati `format.ignore`, dan gate `scope` mengabaikan `scope.always`, sehingga hasil
    verifier sendiri tidak pernah dianggap perubahan.
 8. Gate `format` memakai `commands.format` dari manifest sebagai awalan perintah, lalu dijalankan per file:

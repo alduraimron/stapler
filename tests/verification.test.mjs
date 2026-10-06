@@ -52,6 +52,15 @@ for (const [file, count] of Object.entries(spec)) {
 process.exit(errors > 0 ? 1 : 0);
 `;
 
+const FAKE_LINT_NOISY = `import fs from "node:fs";
+const spec = JSON.parse(fs.readFileSync(".pi/stapler/fake-lint.json", "utf8"));
+const abs = (p) => new URL(p, \`file://\${process.cwd()}/\`).pathname;
+const results = Object.entries(spec).map(([file, count]) => ({ filePath: abs(file), errorCount: count, warningCount: 0 }));
+process.stdout.write(JSON.stringify(results));
+process.stderr.write("npm notice run eslint --format json\\n");
+process.exit(1);
+`;
+
 // Parser custom contoh: membaca keluaran "path:jumlah" satu per baris.
 const CUSTOM_PARSER = `export default function parse(output) {
   const files = {};
@@ -80,7 +89,14 @@ function fixture({ lint = true, lintFormat = "stylish", lintConfig = {} } = {}) 
 
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_TEMPLATE, "utf8"));
   manifest.projectName = "test-fixture";
-  const lintScript = lintFormat === "json" ? "fake-lint-json.mjs" : lintFormat === "plain" ? "fake-lint-plain.mjs" : "fake-lint.mjs";
+  const lintScript =
+    lintFormat === "json" || lintFormat === "json-with-noise"
+      ? lintFormat === "json"
+        ? "fake-lint-json.mjs"
+        : "fake-lint-json-noisy.mjs"
+      : lintFormat === "plain"
+        ? "fake-lint-plain.mjs"
+        : "fake-lint.mjs";
   manifest.commands = {
     format: null,
     typecheck: null,
@@ -93,7 +109,14 @@ function fixture({ lint = true, lintFormat = "stylish", lintConfig = {} } = {}) 
   fs.copyFileSync(VERIFIER, path.join(dir, ".pi/stapler/verification.mjs"));
 
   if (lint) {
-    const script = lintFormat === "json" ? FAKE_LINT_JSON : lintFormat === "plain" ? FAKE_LINT_PLAIN : FAKE_LINT;
+    const script =
+      lintFormat === "json"
+        ? FAKE_LINT_JSON
+        : lintFormat === "json-with-noise"
+          ? FAKE_LINT_NOISY
+          : lintFormat === "plain"
+            ? FAKE_LINT_PLAIN
+            : FAKE_LINT;
     fs.writeFileSync(path.join(dir, ".pi/stapler", lintScript), script);
     fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 1 }));
     if (lintConfig.parserPath) {
@@ -235,6 +258,30 @@ test("parse yang tidak dikenali dilaporkan sebagai keterbatasan, bukan hijau", (
   const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
   assert.equal(lint.parser, "none");
   assert.match(lint.detail, /hasil tidak terbaca.*set lint\.parser/);
+});
+
+test("JSON lint tetap terbaca walau stderr ditempel di belakangnya", () => {
+  const dir = fixture({ lintFormat: "json-with-noise" });
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 0);
+  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(lint.parser, "eslint-json");
+  assert.match(lint.detail, /1 error/);
+});
+
+test("file di lint.ignoreFiles tidak masuk perbandingan", () => {
+  const dir = fixture({ lintFormat: "json", lintConfig: { ignoreFiles: ["src/legacy.ts"] } });
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 0);
+  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.match(lint.detail, /1 file diabaikan oleh lint\.ignoreFiles/);
+});
+
+test("baseline tidak ditulis kalau hasil lint tidak terbaca", () => {
+  const dir = fixture({ lintFormat: "plain", lintConfig: { parser: "eslint-stylish" } });
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  const state = JSON.parse(fs.readFileSync(path.join(dir, ".pi/stapler/verification.json"), "utf8"));
+  assert.ok(!state.baseline || state.baseline.errors === null || state.baseline.files === undefined);
 });
 
 test("template manifest tetap JSON yang sah dan memuat field kontrak", () => {

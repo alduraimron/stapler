@@ -235,29 +235,38 @@ function parseLintPerFile(output) {
  */
 
 /** eslint --format json: array hasil per file. */
-function parseLintJson(output) {
-  const start = output.indexOf("[");
-  if (start === -1) return null;
-  try {
-    const data = JSON.parse(output.slice(start));
-    if (!Array.isArray(data)) return null;
-    const files = {};
-    let errors = 0;
-    let warnings = 0;
-    for (const item of data) {
-      const errorsHere = Number(item?.errorCount ?? 0);
-      const warningsHere = Number(item?.warningCount ?? 0);
-      errors += errorsHere;
-      warnings += warningsHere;
-      if (errorsHere > 0 && typeof item?.filePath === "string") {
-        const file = path.relative(ROOT, item.filePath);
-        files[file] = (files[file] ?? 0) + errorsHere;
+function parseLintJson(candidates) {
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const start = raw.indexOf("[");
+    if (start === -1) continue;
+    // Kandidat akhir: sampai ujung keluaran, atau sampai bracket penutup terakhir.
+    // Diperlukan karena stderr bisa ditempel setelah JSON (mis. baris "npm notice").
+    for (const end of [raw.length, raw.lastIndexOf("]") + 1]) {
+      if (end <= start) continue;
+      try {
+        const data = JSON.parse(raw.slice(start, end));
+        if (!Array.isArray(data)) continue;
+        const files = {};
+        let errors = 0;
+        let warnings = 0;
+        for (const item of data) {
+          const errorsHere = Number(item?.errorCount ?? 0);
+          const warningsHere = Number(item?.warningCount ?? 0);
+          errors += errorsHere;
+          warnings += warningsHere;
+          if (errorsHere > 0 && typeof item?.filePath === "string") {
+            const file = path.relative(ROOT, item.filePath);
+            files[file] = (files[file] ?? 0) + errorsHere;
+          }
+        }
+        return { errors, warnings, files };
+      } catch {
+        // coba kandidat berikutnya
       }
     }
-    return { errors, warnings, files };
-  } catch {
-    return null;
   }
+  return null;
 }
 
 async function parseLintCustom(output, parserPath) {
@@ -281,11 +290,22 @@ function emptyParse(mode) {
   return { mode, errors: null, warnings: null, files: {} };
 }
 
-async function parseLint(output, config) {
+/** Buang file yang tidak relevan (mis. artefak workflow atau clone paket) dari perbandingan per file. */
+function filterIgnoredFiles(parsed, ignorePatterns) {
+  const kept = {};
+  let ignored = 0;
+  for (const [file, count] of Object.entries(parsed.files ?? {})) {
+    if (matchesAny(file, ignorePatterns)) ignored += 1;
+    else kept[file] = count;
+  }
+  return { ...parsed, files: kept, ignoredFiles: ignored };
+}
+
+async function parseLint(output, config, stdout) {
   const strategy = config.lint?.parser ?? "auto";
 
   const asJson = () => {
-    const parsed = parseLintJson(output);
+    const parsed = parseLintJson([stdout, output]);
     return parsed ? { mode: "eslint-json", ...parsed } : null;
   };
   const asStylish = () => {
@@ -405,8 +425,10 @@ async function main() {
   } else {
     const result = run(lint.split(" ")[0], lint.split(" ").slice(1));
     const output = `${result.stdout}${result.stderr}`;
-    const parsed = await parseLint(output, config);
+    const ignoreFiles = config.lint?.ignoreFiles ?? [".pi/**"];
+    const parsed = filterIgnoredFiles(await parseLint(output, config, result.stdout), ignoreFiles);
     const perFile = parsed.files;
+    const ignoredNote = parsed.ignoredFiles > 0 ? `; ${parsed.ignoredFiles} file diabaikan oleh lint.ignoreFiles` : "";
     const summary = parsed.errors === null ? null : { errors: parsed.errors, warnings: parsed.warnings ?? 0 };
     const parserNote = ["exit-only", "custom", "none"].includes(parsed.mode) ? `; parser ${parsed.mode}` : "";
 
@@ -457,7 +479,7 @@ async function main() {
       gates.push({
         name: "lint",
         status: "warn",
-        detail: `${total}; baseline belum tercatat, jalankan --refresh-baseline${parserNote}`,
+        detail: `${total}; baseline belum tercatat, jalankan --refresh-baseline${parserNote}${ignoredNote}`,
         parser: parsed.mode,
         samples: Object.entries(perFile)
           .slice(0, 5)
@@ -467,7 +489,7 @@ async function main() {
       gates.push({
         name: "lint",
         status: "fail",
-        detail: `error baru: ${comparison.regressions.join("; ")}`,
+        detail: `error baru: ${comparison.regressions.join("; ")}${ignoredNote}`,
         parser: parsed.mode,
         samples: comparison.preExisting.slice(0, 3),
       });
@@ -477,7 +499,7 @@ async function main() {
       gates.push({
         name: "lint",
         status: "warn",
-        detail: `${total}; baseline ${baseline.errors ?? "belum tercatat"}${parserNote}`,
+        detail: `${total}; baseline ${baseline.errors ?? "belum tercatat"}${parserNote}${ignoredNote}`,
         parser: parsed.mode,
         samples: comparison.preExisting.slice(0, 3),
       });
@@ -525,7 +547,12 @@ async function main() {
     ok,
     checkedAt: new Date().toISOString(),
   };
-  if (options.refresh && lintBaseline) next.baseline = lintBaseline;
+  // Baseline per file hanya diperbarui saat diminta, dan hanya kalau hasil lint benar-benar terbaca.
+  // Menulis baseline dari hasil yang tidak terbaca akan mencatat 0 error, dan itu menyesatkan.
+  const lintGate = gates.find((gate) => gate.name === "lint");
+  const baselineBisaDipercaya = ["eslint-json", "eslint-stylish", "custom"].includes(lintGate?.parser);
+  if (options.refresh && lintBaseline && baselineBisaDipercaya) next.baseline = lintBaseline;
+  else if (options.refresh) notes.push("baseline tidak diperbarui: hasil lint belum bisa dibaca");
   fs.writeFileSync(RESULT_PATH, `${JSON.stringify(next, null, 2)}\n`);
 
   if (options.json) {
