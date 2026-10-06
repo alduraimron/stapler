@@ -114,13 +114,17 @@ function deviationsFromPack() {
 
 function main() {
   const json = process.argv.includes("--json");
+  const postPull = process.argv.includes("--post-pull");
   const findings = [];
   const add = (code, path_, detail) => findings.push({ code, path: path_, detail });
   const notes = [];
+  /** Perintah konkret yang perlu dijalankan user; hanya ditampilkan dengan --post-pull. */
+  const drill = [];
 
   if (!fs.existsSync(PROVENANCE_PATH) || !fs.existsSync(MANIFEST_PATH)) {
     add("MISS", ".pi/stapler/provenance.json", "pack belum lengkap; jalankan stapler-context init");
-    return report(findings, notes, json);
+    drill.push("jalankan skill stapler-context mode init");
+    return report(findings, notes, json, postPull, drill);
   }
 
   const provenance = JSON.parse(fs.readFileSync(PROVENANCE_PATH, "utf8"));
@@ -193,31 +197,45 @@ function main() {
       const changed = git(["diff", "--name-only", `${baseline.head}..HEAD`]);
       const files = changed.ok ? changed.out.split("\n").filter(Boolean) : [];
       notes.push(`baseline diukur di HEAD ${baseline.head}, sekarang ${current} (${files.length} file berubah)`);
+      drill.push("node .pi/stapler/verification.mjs --refresh-baseline --scope-from .pi/stapler/runs/<run terakhir>.json");
       if (files.some((file) => /^package(-lock)?\.json$/.test(file))) {
         notes.push("package.json berubah: jalankan npm install");
+        drill.push("npm install");
       }
       if (files.includes("prisma/schema.prisma")) {
         notes.push("prisma/schema.prisma berubah: jalankan npm run db:generate, sinkronkan DB lokal, lalu restart dev server");
+        drill.push("npm run db:generate", "sinkronkan DB lokal (npm run db:push) lalu restart dev server");
       }
     }
   } else {
     notes.push("bukan repo git: pemeriksaan HEAD dilewati");
   }
 
-  return report(findings, notes, json);
+  const wajib = findings.filter((finding) => finding.code !== "WARN");
+  if (wajib.length > 0) {
+    drill.unshift(`stapler-context refresh (temuan: ${[...new Set(wajib.map((finding) => finding.code))].join(", ")})`);
+  }
+
+  return report(findings, notes, json, postPull, drill);
 }
 
-function report(findings, notes, json) {
+function report(findings, notes, json, postPull = false, drill = []) {
   const wajib = findings.filter((f) => f.code !== "WARN");
   const ok = wajib.length === 0;
 
   if (json) {
-    console.log(JSON.stringify({ ok, findings, notes }, null, 2));
+    console.log(JSON.stringify({ ok, findings, notes, ...(postPull ? { drill } : {}) }, null, 2));
   } else {
     const lines = ["== check context pack =="];
     if (findings.length === 0) lines.push("  OK      tidak ada temuan");
     for (const finding of findings) lines.push(`  ${finding.code.padEnd(16)} ${finding.path} - ${finding.detail}`);
     for (const note of notes) lines.push(`  WARN    ${note}`);
+    if (postPull) {
+      lines.push("", "== drill pasca-pull ==");
+      if (drill.length === 0) lines.push("  tidak ada langkah tambahan yang terdeteksi");
+      drill.forEach((step, index) => lines.push(`  ${index + 1}. ${step}`));
+      lines.push("  lalu kerjakan task seperti biasa lewat skill stapler");
+    }
     lines.push("");
     lines.push(ok ? "  pack akurat: aman dipakai" : `  pack perlu perhatian: ${wajib.length} temuan wajib`);
     if (!ok) lines.push("  jalankan stapler-context refresh untuk mengompilasi ulang");

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "slug": "<domain>-<ringkas>",
+  "mode": "bugfix",
+  "play": null,
+  "startedAt": "<ISO 8601>",
+  "scope": ["<path/file-yang-disetujui>", "<path/file-lain>"],
+  "acceptance": ["<yang bisa diperiksa>"],
+  "rules": {
+    "pack": ["<butir rules.md yang relevan>"],
+    "harness": ["<file konteks harness yang relevan>"],
+    "deviations": ["<baris deviations.md yang relevan, atau kosong>"]
+  },
+  "acc": "first",
+  "verification": null
+}

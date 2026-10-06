@@ -125,7 +125,7 @@ standar:
 |- adr-index.md        GENERATED topik -> file ADR
 |- design.md           GENERATED penunjuk aset desain + aturan pembacaannya
 |- verification.json   GENERATED perintah, baseline, hasil run terakhir
-`- runs/               GENERATED artefak per task
+`- runs/               GENERATED artefak per task (satu file JSON per task)
 ```
 
 Aturan yang menempel:
@@ -273,10 +273,19 @@ Temuan `check`:
 Exit code `check`: `0` kalau hanya `OK` dan `WARN`, `1` kalau ada `STALE`, `HARNESS-CHANGED`, `MISS`, atau
 `DEVIATION-STALE`. Dengan begitu `check` bisa dipakai sebagai gate di langkah 1 `stapler` maupun di CI.
 
+Sumbu kode memakai riwayat, bukan hanya snapshot. `verification.mjs --refresh-baseline` menambahkan entri baru
+ke `baselineHistory` (head, tanggal, jumlah error dan warning, jumlah file) dan mencetak delta terhadap
+pengukuran sebelumnya. Alasannya: pengukuran ulang setelah pull tidak boleh menyembunyikan kenaikan error,
+dan tanpa riwayat kenaikan itu langsung dianggap normal.
+
+Opsi `--post-pull` pada `check.mjs` mengubah pemeriksaan menjadi drill yang bisa dijalankan sesudah pull:
+selain temuan biasa, ia mencetak daftar perintah konkret (`npm install`, `npm run db:generate`, sinkronisasi DB,
+`--refresh-baseline`, atau `stapler-context refresh`) berdasarkan file yang berubah sejak baseline terakhir.
+
 ## 13. Kontrak verifier
 
 ```text
-node .pi/stapler/verification.mjs [--scope <path,...>] [--with-build] [--json] [--refresh-baseline] [--list-gates]
+node .pi/stapler/verification.mjs [--scope <path,...>] [--scope-from <file>] [--with-build] [--json] [--refresh-baseline] [--list-gates]
 ```
 
 - Exit `0`: semua gate hijau, atau merah yang terbukti sudah ada sebelum perubahan ini.
@@ -358,22 +367,30 @@ memindahkan UI dari mock ke API. Play bukan proses; prosesnya tetap milik mode d
 
 ## 15. Artefak run dan gate scope
 
-Setiap task menulis satu file `runs/<tanggal>-<slug>.md`:
+Setiap task menulis satu file `runs/<tanggal>-<slug>.json` sebelum kode diubah:
 
-```text
-scope:        daftar file yang disetujui
-acceptance:   daftar yang bisa diperiksa
-aturan:       sumber aturan yang berlaku (pack, harness, deviasi)
-verifikasi:   angka hasil verifier per gate
-penyimpangan: ada atau tidak, beserta alasannya
-kandidat ADR: daftar atau tidak ada
-ACC:          pertama | perlu diulang (alasan)
+```json
+{
+  "schemaVersion": 1,
+  "slug": "pemda-pengguna-edit-form",
+  "mode": "bugfix",
+  "play": null,
+  "startedAt": "2026-10-06T09:20:00+07:00",
+  "scope": ["src/app/pemda/pengguna/_components/shared/pengguna-form.tsx"],
+  "acceptance": ["klik Edit pertama menampilkan data baris"],
+  "rules": { "pack": ["rules.md: gate lint per file"], "harness": [], "deviations": [] },
+  "acc": "first",
+  "verification": null
+}
 ```
 
-- `scope` dipakai sebagai argumen `--scope` saat verifikasi. Ini yang mengubah invariant "tidak menyentuh
-  file di luar scope" dari niat menjadi gate.
-- Isi `penyimpangan` dan `ACC` adalah bahan evaluasi untuk memelihara skill: titik yang berulang gagal
-  diperbaiki di skillnya, bukan ditambal dengan aturan baru.
+- `scope` adalah daftar file yang **disetujui user**. Verifier membacanya lewat `--scope-from`, sehingga yang
+  digerbang sama dengan yang di-ACC, bukan daftar yang disusun ulang saat verifikasi.
+- Verifier menulis balik hasilnya ke field `verification` di artefak yang sama (head, status per gate, exit
+  code). Dengan begitu satu task menyisakan satu jejak, dan laporan akhir tidak perlu mengarang ulang angka.
+- Field `acceptance`, `rules`, dan `acc` adalah bahan evaluasi untuk memelihara skill: titik yang berulang
+  gagal diperbaiki di skillnya, bukan ditambal dengan aturan baru. Artefak yang tidak terisi berarti loop
+  evaluasi berhenti, dan stapler kehilangan dasar untuk menilai dirinya sendiri.
 
 ## 16. Versi dan kompatibilitas
 

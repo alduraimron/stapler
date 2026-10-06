@@ -6,9 +6,10 @@ Aman dijalankan sesering apa pun, dan ini yang dipanggil `stapler` di langkah 0.
 
 ## Prosedur
 
-Bagian mekanisnya sudah jadi skrip: `node .pi/stapler/check.mjs` (atau `--json` untuk mesin). Jalankan itu
-dulu, lalu kerjakan bagian yang tidak bisa diotomatiskan: menilai dampak temuan dan memutuskan refresh atau
-tidak.
+Bagian mekanisnya sudah jadi skrip: `node .pi/stapler/check.mjs` (atau `--json` untuk mesin). Untuk drill
+sesudah pull, tambahkan `--post-pull`: selain temuan biasa, ia mencetak daftar perintah konkret berdasarkan
+file yang berubah sejak baseline terakhir. Jalankan itu dulu, lalu kerjakan bagian yang tidak bisa
+diotomatiskan: menilai dampak temuan dan memutuskan refresh atau tidak.
 
 Yang dikerjakan skrip:
 
@@ -18,7 +19,7 @@ Yang dikerjakan skrip:
 4. Path yang dirujuk pack: harus ada.
 5. Integritas index ADR: setiap file ADR punya baris di index.
 6. Deviasi: standar tim yang berubah sejak kompilasi memunculkan `DEVIATION-STALE`.
-7. Sumbu kode: HEAD bergerak, baseline ketinggalan, dan pengingat pasca-pull (`npm install` bila `package.json` berubah, `npm run db:generate` dan sinkronisasi DB bila schema berubah).
+7. Sumbu kode: HEAD bergerak, baseline ketinggalan, dan pengingat pasca-pull (`npm install` bila `package.json` berubah, `npm run db:generate` dan sinkronisasi DB bila schema berubah). Riwayat baseline ada di `verification.json`, jadi kenaikan error setelah pull bisa dibandingkan, bukan hanya disimpan.
 
 Yang kamu kerjakan setelahnya:
 

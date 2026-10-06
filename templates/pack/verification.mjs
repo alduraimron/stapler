@@ -30,7 +30,7 @@ const RESULT_PATH = path.join(PACK_DIR, "verification.json");
 
 const FORMAT_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".css", ".scss", ".html"];
 
-const options = { scope: [], withBuild: false, json: false, refresh: false, listGates: false };
+const options = { scope: [], scopeFrom: null, withBuild: false, json: false, refresh: false, listGates: false };
 
 function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
@@ -40,7 +40,23 @@ function parseArgs(argv) {
     else if (arg === "--refresh-baseline") options.refresh = true;
     else if (arg === "--list-gates") options.listGates = true;
     else if (arg === "--scope") options.scope = (argv[i + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    else if (arg === "--scope-from") options.scopeFrom = argv[i + 1] ?? null;
   }
+}
+
+/**
+ * Scope yang disetujui dibaca dari artefak run, supaya yang digerbang sama dengan yang di-ACC.
+ * Hasil verifikasi ditulis balik ke artefak itu supaya satu task menyisakan satu jejak.
+ */
+function scopeFromRun(relativePath) {
+  const full = path.isAbsolute(relativePath) ? relativePath : path.join(ROOT, relativePath);
+  const run = readJson(full, null);
+  if (!run || !Array.isArray(run.scope) || run.scope.length === 0) {
+    console.error(`Run artefak tidak memuat scope yang bisa dipakai: ${relativePath}`);
+    console.error("Isi field `scope` dengan daftar file yang disetujui, lalu jalankan lagi.");
+    process.exit(1);
+  }
+  return { path: full, scope: run.scope, run };
 }
 
 function run(command, args) {
@@ -376,7 +392,8 @@ async function main() {
   }
 
   // 1. Scope
-  const scope = options.scope.length > 0 ? options.scope : (config.scope?.paths ?? []);
+  const runSource = options.scopeFrom ? scopeFromRun(options.scopeFrom) : null;
+  const scope = runSource ? runSource.scope : options.scope.length > 0 ? options.scope : (config.scope?.paths ?? []);
   const always = config.scope?.always ?? [];
   if (scope.length === 0) {
     gates.push({ name: "scope", status: "skip", detail: "tidak ada scope yang diberikan" });
@@ -541,7 +558,40 @@ async function main() {
 
   const ok = problems.length === 0;
 
-  // Tulis hasil. Baseline per file hanya diperbarui saat diminta, supaya run biasa tidak menghapus jejak.
+  // Baseline per file hanya diperbarui saat diminta, dan hanya kalau hasil lint benar-benar terbaca.
+  // Menulis baseline dari hasil yang tidak terbaca akan mencatat 0 error, dan itu menyesatkan.
+  const lintGate = gates.find((gate) => gate.name === "lint");
+  const baselineBisaDipercaya = ["eslint-json", "eslint-stylish", "custom"].includes(lintGate?.parser);
+
+  // Riwayat baseline: pengukuran ulang tidak menimpa pengukuran lama, supaya kenaikan setelah pull
+  // tetap terlihat dan tidak langsung dianggap normal.
+  const history = Array.isArray(previous.baselineHistory) ? previous.baselineHistory.slice(-19) : [];
+  let baselineDelta = null;
+  if (options.refresh && lintBaseline && baselineBisaDipercaya) {
+    const before = previous.baseline ?? null;
+    if (before && typeof before.errors === "number") {
+      baselineDelta = { errors: lintBaseline.errors - before.errors, from: before.head ?? null, to: head };
+    }
+    history.push({
+      head,
+      at: lintBaseline.measuredAt,
+      errors: lintBaseline.errors,
+      warnings: lintBaseline.warnings,
+      files: Object.keys(lintBaseline.files ?? {}).length,
+    });
+    if (baselineDelta && baselineDelta.errors > 0) {
+      notes.push(
+        `baseline naik ${baselineDelta.errors} error dibanding pengukuran di ${baselineDelta.from ?? "HEAD lama"}; pastikan penyebabnya dari kode tim, bukan regresi kita`,
+      );
+    } else if (baselineDelta && baselineDelta.errors < 0) {
+      notes.push(
+        `baseline turun ${Math.abs(baselineDelta.errors)} error dibanding pengukuran di ${baselineDelta.from ?? "HEAD lama"}`,
+      );
+    }
+  } else if (options.refresh) {
+    notes.push("baseline tidak diperbarui: hasil lint belum bisa dibaca");
+  }
+
   const next = {
     ...previous,
     projectName: config.projectName,
@@ -550,17 +600,35 @@ async function main() {
     gates,
     ok,
     checkedAt: new Date().toISOString(),
+    ...(baselineDelta ? { baselineDelta } : {}),
+    ...(history.length > 0 ? { baselineHistory: history } : {}),
   };
-  // Baseline per file hanya diperbarui saat diminta, dan hanya kalau hasil lint benar-benar terbaca.
-  // Menulis baseline dari hasil yang tidak terbaca akan mencatat 0 error, dan itu menyesatkan.
-  const lintGate = gates.find((gate) => gate.name === "lint");
-  const baselineBisaDipercaya = ["eslint-json", "eslint-stylish", "custom"].includes(lintGate?.parser);
   if (options.refresh && lintBaseline && baselineBisaDipercaya) next.baseline = lintBaseline;
-  else if (options.refresh) notes.push("baseline tidak diperbarui: hasil lint belum bisa dibaca");
   fs.writeFileSync(RESULT_PATH, `${JSON.stringify(next, null, 2)}\n`);
 
+  // Write the result back into the run artefact that supplied the scope, so one task leaves one trail.
+  if (runSource) {
+    const updatedRun = {
+      ...runSource.run,
+      verification: {
+        at: next.checkedAt,
+        head,
+        ok,
+        exit: ok ? 0 : 1,
+        gates: gates.map(({ name, status, detail, parser }) => ({
+          name,
+          status,
+          detail,
+          ...(parser ? { parser } : {}),
+        })),
+      },
+    };
+    fs.writeFileSync(runSource.path, `${JSON.stringify(updatedRun, null, 2)}\n`);
+    notes.push(`hasil verifikasi ditulis ke ${path.relative(ROOT, runSource.path)}`);
+  }
+
   if (options.json) {
-    console.log(JSON.stringify({ ok, head, scope, gates, baseline: next.baseline ?? null }, null, 2));
+    console.log(JSON.stringify({ ok, head, scope, gates, baseline: next.baseline ?? null, baselineDelta }, null, 2));
   } else {
     const lines = [`== ${config.projectName} (HEAD ${head}, branch ${branch}) ==`];
     for (const gate of gates) {
@@ -571,6 +639,15 @@ async function main() {
     lines.push("");
     lines.push(ok ? "  hijau, tidak ada regresi" : `  PERLU DIPERBAIKI: ${problems.join(", ")}`);
     if (options.refresh) lines.push("  baseline diperbarui di verification.json");
+    if (baselineDelta) {
+      const arah =
+        baselineDelta.errors === 0
+          ? "tetap"
+          : baselineDelta.errors > 0
+            ? `naik ${baselineDelta.errors}`
+            : `turun ${Math.abs(baselineDelta.errors)}`;
+      lines.push(`  delta baseline: ${arah} error (dari ${baselineDelta.from ?? "HEAD lama"} ke ${baselineDelta.to})`);
+    }
     console.log(lines.join("\n"));
   }
 

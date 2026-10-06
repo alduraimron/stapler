@@ -139,6 +139,41 @@ test("standar yang berubah memunculkan DEVIATION-STALE", () => {
   assert.match(result.stdout, /DEVIATION-STALE\s+\.kiro\/steering\/frontend-architecture\.md/);
 });
 
+test("--post-pull menampilkan drill yang memuat perintah terdeteksi", () => {
+  const { dir, run } = fixture();
+  const git = (args) =>
+    spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: dir, encoding: "utf8" });
+
+  // Baseline dicatat di HEAD lama, lalu package.json berubah setelahnya.
+  const headLama = git(["rev-parse", "--short", "HEAD"]).stdout.trim();
+  fs.writeFileSync(
+    path.join(dir, ".pi/stapler/verification.json"),
+    JSON.stringify({ baseline: { head: headLama, errors: 0, files: {} } }, null, 2),
+  );
+  fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "check-fixture", version: "1.0.1" }));
+  git(["add", "-A"]);
+  git(["commit", "-qm", "chore: bump package"]);
+
+  const hasil = run("check.mjs", ["--post-pull"]);
+  assert.match(hasil.stdout, /drill pasca-pull/);
+  assert.match(hasil.stdout, /npm install/);
+  assert.match(hasil.stdout, /--refresh-baseline/);
+});
+
+test("--post-pull tanpa prasyarat tetap menampilkan langkah verifikasi", () => {
+  const { run } = fixture();
+  const hasil = run("check.mjs", ["--post-pull"]);
+  assert.equal(hasil.status, 0);
+  assert.match(hasil.stdout, /drill pasca-pull/);
+  assert.doesNotMatch(hasil.stdout, /npm install/);
+});
+
+test("tanpa --post-pull, bagian drill tidak muncul", () => {
+  const { run } = fixture();
+  const hasil = run("check.mjs");
+  assert.doesNotMatch(hasil.stdout, /drill pasca-pull/);
+});
+
 test("provenance mempertahankan compiledInto dan menandai file manual", () => {
   const { dir, run } = fixture();
   const provenancePath = path.join(dir, ".pi/stapler/provenance.json");

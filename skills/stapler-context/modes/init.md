@@ -59,6 +59,8 @@ Urutan penulisan:
 11. `plays/*.md` dari template, diisi ringkas sesuai recon. Tandai bagian yang belum diputuskan user sebagai
     pertanyaan terbuka, bukan dikarang.
 12. `index.md`: pintu masuk. Isinya: apa itu pack ini, urutan baca untuk tiap jenis task, dan daftar play.
+13. Buat folder `runs/` kosong. Tempat artefak per task; skill `stapler` yang mengisinya, dan verifier yang
+    menulis balik hasilnya ke sana.
 13. Isi `compiledInto` untuk tiap sumber (file pack mana yang dipengaruhi sumber itu) di `provenance.json`,
     lalu tulis ulang dengan `node .pi/stapler/provenance.mjs --generated-by "stapler-context@<versi>"`.
     Jangan menghitung hash secara manual.

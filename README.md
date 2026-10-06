@@ -46,15 +46,24 @@ memakai skill pertama yang ditemukan saat namanya bertabrakan.
 /skill:stapler <mode>             # kerjakan task
 ```
 
-Setelah pull, dua perintah ini yang paling sering dipakai:
+Setelah pull, satu perintah:
 
 ```bash
-node .pi/stapler/check.mjs        # ada STALE, HARNESS-CHANGED, MISS, atau baseline ketinggalan?
-node .pi/stapler/verification.mjs --scope "<file yang berubah>"   # sebelum commit
+node .pi/stapler/check.mjs --post-pull
 ```
 
-`check.mjs` juga mengingatkan prasyarat pasca-pull: `npm install` bila `package.json` berubah, dan
-`npm run db:generate` plus sinkronisasi DB bila schema berubah.
+Ia memeriksa kebasian pack **dan** mencetak langkah konkret yang perlu dijalankan: `npm install` bila
+`package.json` berubah, `npm run db:generate` plus sinkronisasi DB bila schema berubah, `--refresh-baseline`
+untuk mengukur ulang angka lint, dan `stapler-context refresh` bila ada sumber aturan yang berubah.
+
+Sebelum commit:
+
+```bash
+node .pi/stapler/verification.mjs --scope-from .pi/stapler/runs/<file run>.json
+```
+
+Scope dibaca dari artefak run yang berisi daftar file yang disetujui, dan hasil verifikasi ditulis balik ke
+artefak itu. Angka baseline punya riwayat, jadi kenaikan error setelah pull tetap terlihat.
 
 ## Isi paket
 
@@ -63,7 +72,7 @@ skills/stapler/            alur kerja + mode proses (feature, bugfix, refactor, 
 skills/stapler-context/    compiler + mode (init, check, refresh)
 templates/pack/            kerangka context pack: manifest, rules, deviations, verifier, check, provenance
 templates/plays/           kerangka konvensi kerja khas project yang disalin ke pack
-templates/tasks/           kerangka laporan pra-ACC dan artefak run
+templates/tasks/           kerangka laporan pra-ACC dan artefak run (JSON)
 prompts/stapler-kickoff.md prompt mulai sesi (nama sengaja diberi awalan `stapler-` supaya tidak bertabrakan dengan prompt project bernama `kickoff`)
 docs/design.md             kontrak desain: istilah, precedence, struktur pack, kontrak verifier
 ```

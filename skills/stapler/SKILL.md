@@ -133,21 +133,25 @@ ulangi langkah 2 untuk bagian yang berubah saja.
 
 ### 4. Execute
 
-- Sesempit daftar file di langkah 2. Tulis scope itu ke `runs/` sebelum mulai.
-- Komentar kode hanya WHY dan singkat, mengikuti aturan komentar di pack.
+- Tulis artefak run lebih dulu: `.pi/stapler/runs/<tanggal>-<slug>.json`, bentuknya mengikuti
+  `templates/tasks/run-log.json` di paket. Isi `scope` dengan daftar file yang disetujui user persis seperti
+  di laporan pra-ACC, plus `mode`, `play`, `acceptance`, `rules`, dan `acc`. Artefak ini yang dibaca verifier,
+  jadi jangan mengandalkan daftar yang disusun ulang saat verifikasi.
+- Kerjakan sesempit scope itu. Komentar kode hanya WHY dan singkat, mengikuti aturan komentar di pack.
 - Keputusan yang bertahan melampaui task ini: kumpulkan sebagai kandidat ADR dan tulis di langkah 6
   setelah user setuju, mengikuti bentuk ADR di pack.
 - Temuan di luar scope: catat di laporan, jangan dikerjakan.
 
 ### 5. Verify (loop)
 
-- Jalankan verifier yang dideklarasikan `manifest.json`, dengan scope dari `runs/`:
-  `node .pi/stapler/verification.mjs --scope <daftar file>` dan tambahkan `--with-build` sesuai mode atau
-  sesuai isi `manifest.json`.
+- Jalankan verifier yang dideklarasikan `manifest.json` dengan artefak run sebagai sumber scope:
+  `node .pi/stapler/verification.mjs --scope-from .pi/stapler/runs/<file run>.json`, dan tambahkan
+  `--with-build` sesuai mode atau sesuai isi `manifest.json`.
+- Hasil verifikasi ditulis balik oleh verifier ke field `verification` di artefak run, jadi jangan mencatat
+  angkanya secara manual.
 - Merah: diagnosis penyebabnya, perbaiki, jalankan lagi. Jangan berhenti setelah satu percobaan.
 - Merah karena kode tim lain atau artefak build: buktikan penyebabnya dan laporkan apa adanya. Jangan
   memperbaiki di luar scope, jangan klaim hijau.
-- Angka hasil verifikasi dicatat ke `runs/`.
 
 ### 6. Review akhir
 
@@ -163,7 +167,8 @@ dan kesepakatan proses yang akan ditanyakan lagi nanti.
 ### 7. Laporan
 
 Ringkas: file yang berubah, hasil verifikasi berupa angka atau exit code, deviasi dari rencana dan
-alasannya, yang belum diuji, temuan di luar scope, saran pesan commit satu baris.
+alasannya, yang belum diuji, temuan di luar scope, saran pesan commit satu baris. Sebutkan juga file run yang
+menjadi jejak task ini, dan lengkapi field `acceptance` serta `acc` kalau belum terisi.
 
 Tiga baris ini wajib ada:
 

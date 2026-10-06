@@ -284,6 +284,57 @@ test("baseline tidak ditulis kalau hasil lint tidak terbaca", () => {
   assert.ok(!state.baseline || state.baseline.errors === null || state.baseline.files === undefined);
 });
 
+test("scope dari artefak run dipakai, dan hasil verifikasi ditulis balik ke artefak itu", () => {
+  const dir = fixture();
+  fs.mkdirSync(path.join(dir, ".pi/stapler/runs"), { recursive: true });
+  const runPath = ".pi/stapler/runs/2026-10-06-demo.json";
+  fs.writeFileSync(
+    path.join(dir, runPath),
+    JSON.stringify({ schemaVersion: 1, slug: "demo", scope: ["src/app.ts"], acc: "first" }, null, 2),
+  );
+
+  fs.writeFileSync(path.join(dir, "catatan.txt"), "x\n");
+  const gagal = verify(dir, ["--scope-from", runPath]);
+  assert.equal(gagal.code, 1);
+  assert.match(gagal.out, /FAIL\s+scope.*catatan\.txt/);
+
+  fs.rmSync(path.join(dir, "catatan.txt"));
+  const hijau = verify(dir, ["--scope-from", runPath]);
+  assert.equal(hijau.code, 0);
+
+  const written = JSON.parse(fs.readFileSync(path.join(dir, runPath), "utf8"));
+  assert.equal(written.verification.exit, 0);
+  assert.match(written.verification.head, /^[0-9a-f]{7,}$/);
+  assert.ok(Array.isArray(written.verification.gates));
+  assert.equal(written.slug, "demo");
+});
+
+test("artefak run tanpa scope dilaporkan sebagai kesalahan yang jelas", () => {
+  const dir = fixture();
+  fs.mkdirSync(path.join(dir, ".pi/stapler/runs"), { recursive: true });
+  const runPath = ".pi/stapler/runs/kosong.json";
+  fs.writeFileSync(path.join(dir, runPath), JSON.stringify({ schemaVersion: 1, scope: [] }));
+  const hasil = verify(dir, ["--scope-from", runPath]);
+  assert.equal(hasil.code, 1);
+  assert.match(hasil.out, /tidak memuat scope/);
+});
+
+test("refresh baseline menyimpan riwayat dan melaporkan delta", () => {
+  const dir = fixture();
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  const pertama = JSON.parse(fs.readFileSync(path.join(dir, ".pi/stapler/verification.json"), "utf8"));
+  assert.equal(pertama.baselineHistory.length, 1);
+  assert.equal(pertama.baselineHistory[0].errors, 1);
+
+  fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 3 }));
+  const out = verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  const kedua = JSON.parse(fs.readFileSync(path.join(dir, ".pi/stapler/verification.json"), "utf8"));
+  assert.equal(kedua.baselineHistory.length, 2);
+  assert.equal(kedua.baselineDelta.errors, 2);
+  assert.match(out.out, /delta baseline: naik 2 error/);
+  assert.match(out.out, /baseline naik 2 error/);
+});
+
 test("template manifest tetap JSON yang sah dan memuat field kontrak", () => {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_TEMPLATE, "utf8"));
   assert.equal(manifest.schemaVersion, 1);
