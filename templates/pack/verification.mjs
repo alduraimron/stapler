@@ -443,9 +443,13 @@ async function main() {
     };
     const comparison = compareLintPerFile(perFile, baseline.files, scope);
 
+    // Jumlah di baseline dihitung dari peta file yang sudah disaring, supaya angkanya konsisten
+    // dengan rincian per file. Total mentah dari linter tetap dipakai untuk tampilan gate.
+    const filteredErrorTotal = Object.values(perFile).reduce((sum, count) => sum + count, 0);
+
     lintBaseline = {
-      errors: summary?.errors ?? Number(baseline.errors ?? 0),
-      warnings: summary?.warnings ?? Number(baseline.warnings ?? 0),
+      errors: parsed.errors === null ? Number(baseline.errors ?? 0) : filteredErrorTotal,
+      warnings: parsed.warnings ?? Number(baseline.warnings ?? 0),
       files: perFile,
       measuredAt: new Date().toISOString().slice(0, 10),
       head,

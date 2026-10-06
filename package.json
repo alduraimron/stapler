@@ -1,17 +1,28 @@
 {
   "name": "stapler",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "type": "module",
   "description": "Alur kerja engineering yang dijaga gerbang ACC untuk agent, plus compiler yang mengubah sumber project menjadi satu context pack di .pi/stapler.",
-  "keywords": ["pi-package", "workflow", "agent", "context-engineering", "context-pack"],
+  "keywords": [
+    "pi-package",
+    "workflow",
+    "agent",
+    "context-engineering",
+    "context-pack"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=20"
   },
   "pi": {
-    "skills": ["./skills/stapler", "./skills/stapler-context"],
-    "prompts": ["./prompts"]
+    "skills": [
+      "./skills/stapler",
+      "./skills/stapler-context"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs"
