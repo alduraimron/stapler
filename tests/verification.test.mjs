@@ -1,0 +1,248 @@
+// Tes kontrak verifier. Dipakai supaya gate-nya bisa dipercaya: gate yang tidak pernah diuji akan
+// diam-diam selalu hijau.
+//
+// Jalankan: npm test
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const VERIFIER = path.join(PACKAGE_ROOT, "templates/pack/verification.mjs");
+const MANIFEST_TEMPLATE = path.join(PACKAGE_ROOT, "templates/pack/manifest.json");
+
+const FAKE_LINT = `import fs from "node:fs";
+const spec = JSON.parse(fs.readFileSync(".pi/stapler/fake-lint.json", "utf8"));
+const abs = (p) => new URL(p, \`file://\${process.cwd()}/\`).pathname;
+let errors = 0;
+for (const [file, count] of Object.entries(spec)) {
+  if (count === 0) continue;
+  console.log(abs(file));
+  for (let i = 0; i < count; i += 1) console.log(\`  \${i + 1}:1  error  Pesan palsu  rule-\${i}\`);
+  console.log();
+  errors += count;
+}
+console.log(\`\\u2716 \${errors} problems (\${errors} errors, 0 warnings)\`);
+`;
+
+const FAKE_LINT_JSON = `import fs from "node:fs";
+const spec = JSON.parse(fs.readFileSync(".pi/stapler/fake-lint.json", "utf8"));
+const abs = (p) => new URL(p, \`file://\${process.cwd()}/\`).pathname;
+const results = Object.entries(spec).map(([file, count]) => ({
+  filePath: abs(file),
+  errorCount: count,
+  warningCount: 0,
+}));
+const errors = results.reduce((sum, item) => sum + item.errorCount, 0);
+console.log(JSON.stringify(results));
+process.exit(errors > 0 ? 1 : 0);
+`;
+
+const FAKE_LINT_PLAIN = `import fs from "node:fs";
+const spec = JSON.parse(fs.readFileSync(".pi/stapler/fake-lint.json", "utf8"));
+let errors = 0;
+for (const [file, count] of Object.entries(spec)) {
+  console.log(\`\${file}:\${count}\`);
+  errors += count;
+}
+process.exit(errors > 0 ? 1 : 0);
+`;
+
+// Parser custom contoh: membaca keluaran "path:jumlah" satu per baris.
+const CUSTOM_PARSER = `export default function parse(output) {
+  const files = {};
+  let errors = 0;
+  for (const line of output.trim().split("\\n").filter(Boolean)) {
+    const [file, count] = line.split(":");
+    const value = Number(count);
+    if (value > 0) {
+      files[file] = value;
+      errors += value;
+    }
+  }
+  return { errors, warnings: 0, files };
+}
+`;
+
+function git(dir, args) {
+  return spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+}
+
+/** Buat repo sementara berisi pack minimal, supaya gate bisa diuji tanpa project nyata. */
+function fixture({ lint = true, lintFormat = "stylish", lintConfig = {} } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stapler-test-"));
+  fs.mkdirSync(path.join(dir, ".pi/stapler"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+
+  const manifest = JSON.parse(fs.readFileSync(MANIFEST_TEMPLATE, "utf8"));
+  manifest.projectName = "test-fixture";
+  const lintScript = lintFormat === "json" ? "fake-lint-json.mjs" : lintFormat === "plain" ? "fake-lint-plain.mjs" : "fake-lint.mjs";
+  manifest.commands = {
+    format: null,
+    typecheck: null,
+    lint: lint ? `node .pi/stapler/${lintScript}` : null,
+    test: null,
+    build: null,
+  };
+  manifest.lint = { ...manifest.lint, ...lintConfig };
+  fs.writeFileSync(path.join(dir, ".pi/stapler/manifest.json"), JSON.stringify(manifest, null, 2));
+  fs.copyFileSync(VERIFIER, path.join(dir, ".pi/stapler/verification.mjs"));
+
+  if (lint) {
+    const script = lintFormat === "json" ? FAKE_LINT_JSON : lintFormat === "plain" ? FAKE_LINT_PLAIN : FAKE_LINT;
+    fs.writeFileSync(path.join(dir, ".pi/stapler", lintScript), script);
+    fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 1 }));
+    if (lintConfig.parserPath) {
+      fs.writeFileSync(path.join(dir, lintConfig.parserPath), CUSTOM_PARSER);
+    }
+  }
+
+  fs.writeFileSync(path.join(dir, "src/app.ts"), "export const app = 1;\n");
+  fs.writeFileSync(path.join(dir, "src/legacy.ts"), "export const legacy = 1;\n");
+  git(dir, ["init", "-q"]);
+  git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"]);
+  git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"]);
+  return dir;
+}
+
+function verify(dir, args = []) {
+  const result = spawnSync(process.execPath, [".pi/stapler/verification.mjs", ...args], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+  return { code: result.status, out: `${result.stdout}${result.stderr}` };
+}
+
+test("baseline yang belum tercatat dilaporkan, bukan dianggap regresi", () => {
+  const dir = fixture();
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 0);
+  assert.match(out, /WARN\s+lint.*baseline belum tercatat/);
+});
+
+test("tanpa scope, gate scope dilewati dan hasilnya hijau", () => {
+  const dir = fixture();
+  const { code, out } = verify(dir);
+  assert.equal(code, 0);
+  assert.match(out, /SKIP\s+scope/);
+});
+
+test("file berubah di luar scope menggagalkan gate dan keluar dengan exit 1", () => {
+  const dir = fixture();
+  fs.writeFileSync(path.join(dir, "catatan.txt"), "x\n");
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 1);
+  assert.match(out, /FAIL\s+scope.*catatan\.txt/);
+});
+
+test("artefak pack sendiri tidak pernah dianggap perubahan", () => {
+  const dir = fixture();
+  fs.writeFileSync(path.join(dir, "src/app.ts"), "export const app = 2;\n");
+  verify(dir, ["--scope", "src/app.ts"]);
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 0);
+  assert.doesNotMatch(out, /verification\.json/);
+});
+
+test("gate yang belum dideklarasikan dilaporkan skip, bukan hijau", () => {
+  const dir = fixture({ lint: false });
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 0);
+  assert.match(out, /SKIP\s+lint\s+perintah belum dideklarasikan/);
+  assert.match(out, /SKIP\s+test/);
+});
+
+test("regresi lint terdeteksi walau total error tidak berubah", () => {
+  const dir = fixture();
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+
+  // Total tetap 1, tapi error berpindah ke file yang sedang dikerjakan. Perbandingan total saja akan lolos.
+  fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 0, "src/app.ts": 1 }));
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 1);
+  assert.match(out, /FAIL\s+lint.*error baru: src\/app\.ts naik dari 0 ke 1/);
+});
+
+test("error baru hanya di luar scope dilaporkan sebagai catatan, bukan regresi", () => {
+  const dir = fixture();
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  fs.writeFileSync(
+    path.join(dir, ".pi/stapler/fake-lint.json"),
+    JSON.stringify({ "src/legacy.ts": 1, "src/tim.ts": 3 }),
+  );
+  const { code, out } = verify(dir, ["--scope", "src/app.ts"]);
+  assert.equal(code, 0);
+  assert.match(out, /WARN\s+lint/);
+});
+
+test("keluaran --json bisa dibaca mesin dan memuat daftar gate", () => {
+  const dir = fixture();
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 0);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.ok, true);
+  const names = parsed.gates.map((gate) => gate.name);
+  for (const expected of ["scope", "format", "typecheck", "lint", "test", "build"]) {
+    assert.ok(names.includes(expected), `gate ${expected} hilang`);
+  }
+});
+
+test("parser eslint-json mendeteksi regresi per file seperti parser stylish", () => {
+  const dir = fixture({ lintFormat: "json" });
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 0, "src/app.ts": 1 }));
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  const lint = parsed.gates.find((gate) => gate.name === "lint");
+  assert.equal(lint.parser, "eslint-json");
+  assert.match(lint.detail, /src\/app\.ts naik dari 0 ke 1/);
+});
+
+test("parser custom dari project dipakai saat lint.parser bernilai custom", () => {
+  const dir = fixture({
+    lintFormat: "plain",
+    lintConfig: { parser: "custom", parserPath: ".pi/stapler/lint-parser.mjs" },
+  });
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/legacy.ts": 0, "src/app.ts": 2 }));
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 1);
+  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(lint.parser, "custom");
+  assert.match(lint.detail, /src\/app\.ts naik dari 0 ke 2/);
+});
+
+test("mode exit-only tidak pernah menggagalkan gate karena isi, dan menyebut batasannya", () => {
+  const dir = fixture({ lintFormat: "plain", lintConfig: { parser: "exit-only" } });
+  verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
+  fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/app.ts": 5 }));
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 0);
+  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(lint.parser, "exit-only");
+  assert.match(lint.detail, /perbandingan per file tidak tersedia/);
+});
+
+test("parse yang tidak dikenali dilaporkan sebagai keterbatasan, bukan hijau", () => {
+  const dir = fixture({ lintFormat: "plain", lintConfig: { parser: "eslint-stylish" } });
+  const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
+  assert.equal(code, 0);
+  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(lint.parser, "none");
+  assert.match(lint.detail, /hasil tidak terbaca.*set lint\.parser/);
+});
+
+test("template manifest tetap JSON yang sah dan memuat field kontrak", () => {
+  const manifest = JSON.parse(fs.readFileSync(MANIFEST_TEMPLATE, "utf8"));
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.rawReads, "index-only");
+  assert.ok(Array.isArray(manifest.precedence));
+  assert.equal(manifest.precedence[0], "safety-floor");
+  assert.ok(manifest.format.ignore.includes(".pi/**"));
+  assert.equal(manifest.lint.parser, "auto");
+});
