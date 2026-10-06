@@ -391,13 +391,18 @@ Setiap task menulis satu file `runs/<tanggal>-<slug>.json` sebelum kode diubah:
 - Field `acceptance`, `rules`, dan `acc` adalah bahan evaluasi untuk memelihara skill: titik yang berulang
   gagal diperbaiki di skillnya, bukan ditambal dengan aturan baru. Artefak yang tidak terisi berarti loop
   evaluasi berhenti, dan stapler kehilangan dasar untuk menilai dirinya sendiri.
+- Field opsional `delegations` mencatat profil delegasi, ID session, status, dan penilaian agent utama.
+  Run lama tanpa field ini tetap sah pada `schemaVersion: 1`. Verifier mempertahankan field tersebut,
+  tetapi tidak menjadikannya bukti gate lulus. Kontraknya ada di [slaver.md](slaver.md).
 
 ## 16. Versi dan kompatibilitas
 
 - `schemaVersion` ada di `manifest.json` dan `provenance.json`.
 - Skill menyatakan rentang skema yang didukung. Pack dengan skema lebih baru: `check` melaporkan `STALE`
   dan `stapler` berhenti.
-- Perubahan yang menambah field opsional: naikkan versi minor paket.
+- Perubahan yang menambah field opsional: naikkan versi minor paket untuk rilis berikutnya. Integrasi
+  Slaver pada main ini secara eksplisit mempertahankan metadata 0.5.1 atas permintaan user, tanpa tag
+  baru dan tanpa memindahkan tag lama.
 - Perubahan yang mengubah arti field, menghapus field, atau mengubah bentuk keluaran verifier: naikkan
   versi mayor skema dan sediakan catatan migrasi di `docs/`.
 
@@ -410,3 +415,25 @@ Setiap task menulis satu file `runs/<tanggal>-<slug>.json` sebelum kode diubah:
 3. Apakah `refresh` boleh berjalan otonom tanpa ACC untuk perubahan yang murni kosmetik.
 4. Format tunggal untuk `runs/` supaya bisa direkap lintas task (hitung ACC yang perlu diulang, gate yang
    paling sering merah).
+
+## 18. Delegasi opsional dengan Slaver
+
+Slaver membantu recon/inspeksi, review read-only, dan (V1) implementasi scoped setelah ACC melalui
+`delegate`. Profil task dan protokolnya ada di [slaver.md](slaver.md); profil bukan mode proses baru atau
+play project. V1 menambah field API `runPath` hanya untuk implementer, bukan field `mode`.
+
+- Consumer boleh mendelegasikan `impact`, `scope-review`, `change-review`, dan `implement-approved`.
+  Aturan pack, precedence, `rawReads`, dan scope tetap mengikat child. Bacaan kelas C child ikut dilaporkan oleh parent.
+- Compiler boleh memakai `source-map` dan `pack-audit` untuk sumber yang dipilih serta hasil kompilasinya.
+  Hak compiler membaca sumber mentah tidak memperluas hak consumer.
+- Agent utama tetap memiliki ACC, scope/keputusan, penulisan pack/ADR/run, pemeriksaan diff sendiri, check,
+  dan verifier. Hasil child bukan approval atau bukti acceptance/gate hijau.
+- V1 implementer hanya menerima run setelah ACC, dengan scope file tepat, acceptance, dan acc first/repeated.
+  Slaver memvalidasi dan membekukan run, serta menegakkan path via scoped_edit/scoped_write, tanpa shell
+  atau edit/write bawaan. Run tidak diperbarui selama child aktif. Deletion/rename tetap milik parent.
+- Delegasi berurutan dan bounded, tanpa meneruskan transcript parent. Scout/reviewer tetap read-only;
+  V0 tetap didukung dengan implementasi oleh parent. Stapler tidak meminta bash atau delegasi rekursif.
+- Jika tool tidak tersedia atau user menolak, parent mengerjakan fase itu sendiri dan menyatakan skip.
+  Kegagalan dilaporkan, tanpa retry otomatis; implementer yang gagal bisa meninggalkan edit parsial dan
+  harus diperiksa sebelum tindakan lain, tanpa rollback/fallback menulis otomatis. Pembatalan menunggu
+  arahan user. Tidak ada fallback yang boleh melewati ACC, gate pack, atau verifier.

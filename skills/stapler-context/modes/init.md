@@ -22,6 +22,11 @@ Baca secukupnya, jangan seluruh repo. Yang dicari, dalam urutan ini:
 Yang juga perlu dicatat: file konteks harness mana yang benar-benar dimuat runtime (global dan project),
 beserta hash-nya, untuk dijadikan entri `watched`.
 
+Jika ada pertanyaan tentang sumber/config/contoh kode yang belum terjawab dan tool `delegate` tersedia,
+gunakan `scout` profil `source-map` sesuai [kontrak delegasi](../../../docs/slaver.md). Pack boleh belum
+ada; berikan area recon dan kandidat sumber yang spesifik. Nilai buktinya sendiri, jangan menyerahkan
+pilihan role sumber atau override kepada child.
+
 ## 2. Wawancara (satu batch)
 
 Kirim sekaligus, masing-masing dengan opsi dan rekomendasi:
@@ -86,6 +91,11 @@ Gate build dijalankan hanya kalau user setuju, karena lambat.
 3. Uji negatif yang murah: pastikan gate `scope` benar-benar bisa gagal. Cara aman: jalankan verifier dengan
    `--scope` yang menunjuk satu file yang tidak berubah, lalu pastikan hasilnya sesuai harapan, tanpa
    mengubah file apa pun.
+4. Setelah hasil kompilasi lolos check, gunakan `reviewer` profil `pack-audit` jika tersedia. Berikan
+   pasangan sumber -> file pack, manifest/override yang di-ACC, dan hasil check. Tinjau larangan/perintah
+   verbatim, makna aturan, dan deviasi, bukan hanya hash. Perbaiki temuan valid lewat kompilasi dalam scope
+   yang di-ACC, lalu ulangi provenance/check dan gate yang terdampak; perubahan MANUAL/keputusan baru butuh
+   ACC. Jika tidak tersedia, audit sendiri dan laporkan skip/fallback.
 
 ## 7. Penunjuk dan laporan
 
@@ -105,6 +115,7 @@ Laporan akhir memuat:
 - Baseline awal dan exit code tiap gate.
 - Temuan: ADR tidak terindeks, standar yang bertentangan, path yang hilang, bagian yang belum diputuskan.
 - Yang belum diverifikasi, misalnya gate build kalau tidak dijalankan.
+- Delegasi yang dipilih: profil, ID, status, penilaian compiler, dan alasan skip/fallback.
 
 ## Jangan
 

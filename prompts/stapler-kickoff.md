@@ -3,7 +3,7 @@ description: Mulai sesi kerja dengan alur stapler - pastikan context pack siap, 
 argument-hint: "[task]"
 ---
 
-Jalankan alur `stapler` mulai dari langkah 0:
+Baca `SKILL.md` milik skill `stapler`, lalu jalankan alurnya mulai dari langkah 0:
 
 1. Baca `.pi/stapler/index.md`, `manifest.json`, `rules.md`, dan `deviations.md`.
 2. Jalankan pemeriksaan kebasian pack (skill `stapler-context` mode `check`, atau versi minimalnya secara
@@ -16,7 +16,9 @@ Kalau pack bersih, laporkan ringkas dalam bahasa Indonesia:
 - mode dan play apa yang kamu pilih untuk task ini, beserta alasannya;
 - aturan berlaku: butir dari `rules.md`, file konteks harness yang relevan, dan deviasi aktif;
 - bahan bacaan tambahan yang kamu pilih beserta alasannya, dengan `path:baris` untuk implementasi terdekat;
-- pertanyaan yang belum bisa dijawab dari pack (kalau ada).
+- pertanyaan yang belum bisa dijawab dari pack (kalau ada);
+- delegasi Slaver pada tahap inspeksi/scope-review sesuai kontrak skill: profil, ID, status, dan penilaian
+  agent utama, atau alasan skip/fallback. Jangan mendelegasikan check, ACC, atau penulisan file.
 
 Lalu berhenti: jangan mengubah file apa pun dan jangan mulai implementasi sebelum aku bilang ACC.
 

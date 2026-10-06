@@ -45,6 +45,20 @@ Precedence saat aturan bertentangan: `safety-floor` lalu `harness-injected` lalu
 `indexed-raw` lalu `general-practice`. Kalau kamu membaca kelas C, sebutkan di laporan pra-ACC: path dan
 alasannya. Itu sinyal untuk compiler bahwa topik itu perlu dikompilasi.
 
+## Slaver (opsional)
+
+Jika tool `delegate` tersedia, gunakan Slaver untuk investigasi terarah dan review independen sesuai
+langkah 1, 2, dan 6. **Baca [kontrak delegasi](../../docs/slaver.md) sebelum pemanggilan pertama.** Profil
+`impact`, `scope-review`, dan `change-review` tetap read-only. Setelah ACC, gunakan profil
+`implement-approved` bila skema `delegate` memuat role `implementer` dan field `runPath` (Slaver V1).
+Slaver V0 tetap bisa dipakai untuk investigasi/review; implementasinya dilakukan parent. Jangan meminta
+scout/reviewer menulis atau mengirim role/field yang tidak tersedia.
+
+Agent utama tetap memegang ACC, scope/keputusan, penulisan pack/ADR/run, check, verifier, dan review diff sendiri.
+Child tunduk pada pack, precedence, safety floor, dan `rawReads` yang sama; bacaan kelas C child ikut
+masuk laporan pra-ACC. Tanpa tool atau jika user meminta tanpa subagent, lakukan fase itu sendiri dan
+laporkan skip. Kegagalan tidak di-retry otomatis; pembatalan menunggu arahan user.
+
 ## Safety floor (tidak bisa ditimpa pack)
 
 1. Jangan pernah mencatat kredensial, token, atau data sensitif ke kode, log, atau laporan.
@@ -97,9 +111,15 @@ yang wajib ada di laporan pra-ACC dan verifikasi tambahannya.
 - Ada aset desain: ambil fakta kasarnya (teks, urutan elemen, state, token warna, komponen yang dipakai)
   mengikuti aturan di `design.md` pack. Jangan forensik piksel.
 - Cek asumsi: pastikan path file, nama fungsi, dan endpoint yang akan disebut benar-benar ada.
+- Bila ada pertanyaan alur/dampak/test yang belum terjawab dan `delegate` tersedia, gunakan `scout`
+  dengan profil `impact`. Berikan pertanyaan bounded, path pack/objek kerja, checklist aturan, dan izin
+  bacaan mentah. Periksa bukti yang menentukan scope; temuan child bukan aturan project baru.
 
 ### 2. Decide & Ask (satu batch, sekali kirim)
 
+- Sebelum mengirim batch ini, untuk scope lintas modul, perubahan kontrak/gate akses, atau keputusan
+  yang belum pasti, gunakan `reviewer` profil `scope-review` jika tersedia. Kirim usulan scope dan
+  acceptance berlabel **belum ACC**, lalu masukkan temuan valid ke batch yang sama. Child tidak memberi ACC.
 - Konflik standar versus implementasi: 3 opsi (ikut standar / ikut implementasi / rekomendasi) plus
   konsekuensinya, lalu tunggu keputusan.
 - Semua pertanyaan sekaligus, masing-masing dengan opsi dan rekomendasi. Yang tidak mengubah hasil tidak
@@ -135,9 +155,23 @@ ulangi langkah 2 untuk bagian yang berubah saja.
 
 - Tulis artefak run lebih dulu: `.pi/stapler/runs/<tanggal>-<slug>.json`, bentuknya mengikuti
   `templates/tasks/run-log.json` di paket. Isi `scope` dengan daftar file yang disetujui user persis seperti
-  di laporan pra-ACC, plus `mode`, `play`, `acceptance`, `rules`, dan `acc`. Artefak ini yang dibaca verifier,
-  jadi jangan mengandalkan daftar yang disusun ulang saat verifikasi.
-- Kerjakan sesempit scope itu. Komentar kode hanya WHY dan singkat, mengikuti aturan komentar di pack.
+  di laporan pra-ACC, plus `mode`, `play`, `acceptance`, `rules`, dan `acc`. Isi `delegations` dengan
+  catatan inspeksi/review pra-ACC yang dipilih, termasuk skip/fallback; baru tulis catatan itu setelah ACC.
+  Artefak ini yang dibaca verifier, jadi jangan mengandalkan daftar yang disusun ulang saat verifikasi.
+- Jika `delegate` mendukung `implementer`/`runPath` dan user tidak meminta tanpa implementer, gunakan
+  profil `implement-approved` sebagai default setelah ACC dan run ditulis. Kirim path run, pack/checklist
+  aturan, dan tujuan bounded; scope/acceptance dimuat Slaver dari run, bukan diganti lewat teks task.
+  Jangan memperbarui run atau menjalankan verifier selama child aktif; catat outcome setelah terminal.
+- Child hanya punya `scoped_edit`/`scoped_write` untuk file tepat dalam scope. Pack/run/ADR/harness tetap
+  milik parent; scope direktori, protected files, symlink atau hardlink harus dilaporkan sebagai blocker,
+  bukan diperluas. Deletion/rename yang sudah di-ACC dikerjakan parent setelah child selesai.
+- Jika implementer tidak tersedia atau user memilih kerja tanpa subagent, catat skip dan kerjakan
+  sendiri sesempit scope itu. Komentar kode hanya WHY dan singkat, mengikuti aturan komentar di pack.
+- Jika implementer gagal, timeout, atau dibatalkan, periksa diff/worktree untuk perubahan parsial lebih
+  dulu. Jangan rollback, retry, atau fallback menulis secara otomatis. Laporkan keadaan dan blocker;
+  pembatalan menunggu arahan user. Completed bukan bukti acceptance: lanjutkan verifikasi oleh parent.
+- Setelah child completed, baca diff sendiri sebelum menjalankan perintah: pastikan scope, keputusan,
+  dan efek samping sesuai ACC. Jangan mengeksekusi perubahan script/gate yang melanggar safety floor.
 - Keputusan yang bertahan melampaui task ini: kumpulkan sebagai kandidat ADR dan tulis di langkah 6
   setelah user setuju, mengikuti bentuk ADR di pack.
 - Temuan di luar scope: catat di laporan, jangan dikerjakan.
@@ -158,6 +192,13 @@ ulangi langkah 2 untuk bagian yang berubah saja.
 Baca `git diff` sendiri sebelum melapor: cari perubahan yang tidak diminta, kode mati, duplikasi, atau
 kontrak yang ikut berubah. Bandingkan dengan acceptance di langkah 2.
 
+Jika `delegate` tersedia, gunakan `reviewer` profil `change-review` sebagai default. Agent utama menyediakan
+diff terkini (termasuk untracked/deletion), scope dan acceptance dari run, checklist aturan/deviasi, serta
+hasil verifier; jangan meminta child menjalankan git atau test. Nilai temuan dan catat outcome/penilaian di
+`delegations`. Perbaikan dalam scope kembali ke langkah 4/5, lalu review ulang bagian yang berubah;
+perluasan scope atau keputusan baru kembali ke pra-ACC. Bila delegasi dilewati/gagal, lakukan review sendiri
+dan laporkan keterbatasannya, tanpa mengklaim review independen lulus.
+
 **Checkpoint ADR** (wajib, jangan dilewati): sebutkan keputusan yang bertahan melampaui task ini. Untuk
 masing-masing: usulkan ADR (tunggu setuju, lalu tulis dan daftarkan di indeks) atau catat alasan tidak
 perlunya. "Tidak ada ADR" tanpa daftar kandidat bukan jawaban yang sah. Pemicu yang sering muncul:
@@ -168,7 +209,8 @@ dan kesepakatan proses yang akan ditanyakan lagi nanti.
 
 Ringkas: file yang berubah, hasil verifikasi berupa angka atau exit code, deviasi dari rencana dan
 alasannya, yang belum diuji, temuan di luar scope, saran pesan commit satu baris. Sebutkan juga file run yang
-menjadi jejak task ini, dan lengkapi field `acceptance` serta `acc` kalau belum terisi.
+menjadi jejak task ini, dan lengkapi field `acceptance` serta `acc` kalau belum terisi. Laporkan delegasi
+yang dipilih: profil, ID, status, penilaian agent utama, dan alasan skip/fallback; jangan menyalin transcript.
 
 Tiga baris ini wajib ada:
 
@@ -191,7 +233,7 @@ Jangan mengarang asumsi untuk menutupi blocker.
 - Semua acceptance terpenuhi, atau dilaporkan mana yang tidak dan kenapa.
 - Verifier hijau, atau merah yang terbukti berasal dari luar perubahan ini.
 - Tidak ada file berubah di luar scope yang disetujui, dibuktikan oleh gate `scope`.
-- `runs/` terisi, dan risiko serta temuan dilaporkan.
+- `runs/` terisi, termasuk catatan delegasi yang dipilih, dan risiko serta temuan dilaporkan.
 
 ## Contoh yang salah (hindari)
 

@@ -22,6 +22,8 @@ sepadan. Item yang tidak pernah mencegah kesalahan sebaiknya dihapus, bukan dipe
 | S8  | Tes validasi frontmatter skill dan rujukan antar berkas                | Mencegah skill rusak diam-diam setelah diedit                                                | S      | Belum                  |
 | S9  | Uji coba play: satu task backend dan satu task slicing UI              | Play belum pernah dipakai; baru mode bugfix yang teruji di task nyata                        | M      | Belum                  |
 | S10 | Mode pemasangan untuk iterasi (path lokal versus tag)                  | Setiap perubahan paket butuh tag baru dan install ulang, memperlambat pengembangan           | S      | Belum                  |
+| S11 | Integrasi Slaver read-only: investigasi, audit pack, review perubahan | Memakai context pack untuk delegasi bounded tanpa memindahkan ACC atau verifier             | M      | Selesai (2026-10-06)   |
+| S12 | Implementer Slaver V1 setelah ACC dengan scope run dan guard runtime | Coding di child tanpa memberi shell atau mengubah scope; parent tetap memegang verifier     | M      | Selesai (2026-10-06)   |
 
 ## Selesai sebelumnya
 
@@ -38,5 +40,5 @@ sepadan. Item yang tidak pernah mencegah kesalahan sebaiknya dihapus, bukan dipe
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | R1 validasi asumsi plan        | Sudah tercakup langkah 1 stapler: cek path dan nama sebelum menulis kode                       |
 | R3 transkrip aset desain       | Sudah diatur `design.md` pack dan play `ui-slicing`; langkah baku tambahan hanya menambah upacara |
-| R6 handoff ke subagent         | Belum ada bukti kebutuhan; tunggu sampai ada task yang memang panjang                          |
+| R6 handoff eksekusi ke subagent | Digantikan S12: approved run dalam alur satu sesi, bukan desain plan/implement lama              |
 | Desain plan/implement (D1-D3)  | Dihapus di v0.3.0; riwayat dan alasannya tetap ada di `docs/DECISIONS.md` dan tag v0.2.0        |

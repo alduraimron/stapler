@@ -307,6 +307,34 @@ test("scope dari artefak run dipakai, dan hasil verifikasi ditulis balik ke arte
   assert.match(written.verification.head, /^[0-9a-f]{7,}$/);
   assert.ok(Array.isArray(written.verification.gates));
   assert.equal(written.slug, "demo");
+  assert.equal("delegations" in written, false, "run lama tidak membutuhkan field delegations");
+});
+
+test("catatan delegasi dipertahankan tanpa menggantikan gate verifier", (t) => {
+  const dir = fixture({ lint: false });
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, ".pi/stapler/runs"), { recursive: true });
+  const runPath = ".pi/stapler/runs/delegasi.json";
+  const fullPath = path.join(dir, runPath);
+  const delegations = [
+    { id: "scout-1", agent: "scout", profile: "impact", status: "completed", assessment: "Bukti diperiksa." },
+    { id: "review-1", agent: "reviewer", profile: "change-review", status: "failed", assessment: "Fallback review sendiri." },
+    { id: "implementation-1", agent: "implementer", profile: "implement-approved", status: "cancelled", assessment: "Perubahan parsial diperiksa parent." },
+    { id: null, agent: "reviewer", profile: "scope-review", status: "skipped", assessment: "Scope sederhana." },
+  ];
+  fs.writeFileSync(fullPath, JSON.stringify({ schemaVersion: 1, scope: ["src/app.ts"], delegations }));
+
+  fs.writeFileSync(path.join(dir, "catatan.txt"), "di luar scope\n");
+  assert.equal(verify(dir, ["--scope-from", runPath]).code, 1);
+  const failed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  assert.equal(failed.verification.exit, 1);
+  assert.deepEqual(failed.delegations, delegations);
+
+  fs.rmSync(path.join(dir, "catatan.txt"));
+  assert.equal(verify(dir, ["--scope-from", runPath]).code, 0);
+  const passed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  assert.equal(passed.verification.exit, 0);
+  assert.deepEqual(passed.delegations, delegations);
 });
 
 test("artefak run tanpa scope dilaporkan sebagai kesalahan yang jelas", () => {

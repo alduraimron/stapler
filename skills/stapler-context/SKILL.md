@@ -35,6 +35,19 @@ Kontrak lengkap ada di `docs/design.md` paket ini. Kalau ada yang berbeda, dokum
 Tentukan mode dari argumen. Kalau kosong: jalankan `check` lebih dulu, lalu sarankan `init` atau `refresh`
 sesuai temuan.
 
+## Slaver (opsional)
+
+Jika tool `delegate` tersedia, pakai `scout` profil `source-map` untuk pertanyaan recon yang belum terjawab
+pada init/refresh, dan `reviewer` profil `pack-audit` setelah hasil kompilasi lolos check. **Baca
+[kontrak delegasi](../../docs/slaver.md) sebelum pemanggilan pertama.** Profil dikirim lewat field API yang
+ada, bukan field `mode` atau role baru. Check mekanis tetap dijalankan compiler, bukan child.
+
+Child read-only: compiler utama tetap memilih sumber bersama user, menunggu ACC, menulis pack, dan
+menjalankan provenance/check/verifier. Batas pembacaan sumber untuk compiler tidak memperluas hak consumer
+`stapler`. Jika tool tidak tersedia atau user meminta tanpa subagent, lakukan fase itu sendiri dan laporkan
+skip. Kegagalan tidak di-retry otomatis; pembatalan menunggu arahan user. Jangan menulis catatan sebelum ACC;
+compiler cukup melaporkan profil, ID, status, dan penilaiannya di chat, tanpa membuat run task.
+
 ## Sumber dan status
 
 Setiap sumber punya `role` di `manifest.json`:
@@ -144,5 +157,5 @@ ada `STALE`, `HARNESS-CHANGED`, `MISS`, atau `DEVIATION-STALE`; `0` kalau hanya 
 - Semua gate yang dideklarasikan sudah dijalankan minimal sekali, dan hasilnya tercatat di
   `verification.json`.
 - `check` bersih setelah kompilasi.
-- Laporan menyebut: file yang dibuat, sumber yang dikompilasi, deviasi yang dicatat, temuan, dan yang belum
-  bisa diverifikasi.
+- Laporan menyebut: file yang dibuat, sumber yang dikompilasi, deviasi yang dicatat, temuan, yang belum
+  bisa diverifikasi, dan hasil delegasi atau alasan skip/fallback.

@@ -12,5 +12,6 @@
     "deviations": ["<baris deviations.md yang relevan, atau kosong>"]
   },
   "acc": "first",
+  "delegations": [],
   "verification": null
 }

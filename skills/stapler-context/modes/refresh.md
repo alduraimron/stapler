@@ -13,6 +13,9 @@ semuanya.
    - Path yang hilang atau ADR yang tidak terindeks: perlu perbaikan indeks.
 3. Untuk tiap sumber yang berubah, tentukan bagian pack mana yang terdampak. Ini yang membuat refresh
    selektif, bukan menulis ulang semua file.
+4. Jika dampak semantik sumber yang berubah belum jelas dan tool `delegate` tersedia, gunakan `scout`
+   profil `source-map` sesuai [kontrak delegasi](../../../docs/slaver.md). Batasi pada sumber berubah dan
+   `compiledInto`; jangan meminta recon seluruh repo. Pilihan role/override tetap milik compiler dan user.
 
 ## 2. Usulkan diff dan tunggu ACC
 
@@ -40,7 +43,13 @@ sebutkan di ringkasan, tapi tidak perlu menunggu keputusan.
 
 1. Jalankan `node .pi/stapler/check.mjs` lagi. Harus bersih dari `STALE`, `MISS`, dan `DEVIATION-STALE`.
 2. Kalau masih ada `WARN`, jelaskan artinya, jangan diamkan.
-3. Laporkan: file yang berubah, aturan yang berubah, deviasi yang berubah, dan sisa temuan.
+3. Jika hasil kompilasi lolos check, gunakan `reviewer` profil `pack-audit` jika tersedia, hanya untuk
+   pasangan sumber -> hasil kompilasi yang berubah. Refresh baseline/HEAD saja tidak memerlukan audit
+   kompilasi. Perbaiki temuan valid melalui compiler dalam scope ACC, lalu ulangi provenance/check dan
+   gate yang terdampak; perubahan MANUAL/keputusan baru butuh ACC. Tanpa Slaver, audit sendiri dan laporkan
+   skip/fallback.
+4. Laporkan: file yang berubah, aturan yang berubah, deviasi yang berubah, sisa temuan, serta profil,
+   ID, status, dan penilaian delegasi atau alasan skip/fallback.
 
 ## Jangan
 

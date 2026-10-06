@@ -31,6 +31,10 @@
 - deviasi aktif: [dari deviations.md, atau `tidak ada`]
 - sumber mentah yang dibaca: [path dan alasan, atau `tidak ada`]
 
+## Delegasi
+
+[profil, ID, status, dan penilaian agent utama; alasan skip/fallback bila ada. Hasil child bukan ACC.]
+
 ## Verifikasi yang akan dijalankan
 
 [perintah verifier dan scope-nya, plus gate tambahan yang relevan]
