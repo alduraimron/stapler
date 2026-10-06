@@ -10,6 +10,17 @@ Dua skill untuk satu alur kerja:
 Prinsipnya satu: **proses portabel, fakta selalu milik project.** Skill tidak pernah menuliskan nama
 folder, perintah build, atau angka baseline. Semua itu ada di pack.
 
+## Riwayat
+
+| Versi | Isi |
+| --- | --- |
+| `v0.3.0` | Desain context pack: skill proses plus compiler `.pi/stapler/`, kontrak verifier, `deviations.md`, `runs/`. Menggantikan desain `plan-task` + `implement-task` yang dihapus dari `main` |
+| `v0.2.0` | Memori keputusan lewat `.pi/adr` pada desain plan/implement |
+| `v0.1.0` | Paket pertama, skill `plan-task` dan `implement-task` |
+
+Alasan penggantian dan perbandingannya ada di [docs/PROPOSAL-context-pack.md](docs/PROPOSAL-context-pack.md).
+Riwayat desain lama tetap bisa dibaca lewat tag `v0.2.0` atau branch `legacy/plan-implement`.
+
 ## Install
 
 ```bash
