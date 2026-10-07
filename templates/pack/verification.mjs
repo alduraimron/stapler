@@ -6,7 +6,8 @@
 //   node .pi/stapler/verification.mjs --scope "a.ts,b.tsx"   # tambah gate scope
 //   node .pi/stapler/verification.mjs --with-build           # tambah gate build (lambat)
 //   node .pi/stapler/verification.mjs --json                 # keluaran mesin
-//   node .pi/stapler/verification.mjs --refresh-baseline     # catat baseline baru, tidak menggagalkan gate
+//   node .pi/stapler/verification.mjs --refresh-baseline     # catat baseline, tetap jalankan gate penuh
+//   node .pi/stapler/verification.mjs --refresh-baseline --baseline-only # ukur lint saja, bukan acceptance
 //   node .pi/stapler/verification.mjs --list-gates           # tampilkan gate dan perintahnya
 //
 // Exit 0: semua gate hijau, atau merah yang terbukti sudah ada sebelum perubahan.
@@ -30,7 +31,7 @@ const RESULT_PATH = path.join(PACK_DIR, "verification.json");
 
 const FORMAT_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".css", ".scss", ".html"];
 
-const options = { scope: [], scopeFrom: null, withBuild: false, json: false, refresh: false, listGates: false };
+const options = { scope: [], scopeFrom: null, withBuild: false, json: false, refresh: false, baselineOnly: false, listGates: false };
 
 function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
@@ -38,9 +39,13 @@ function parseArgs(argv) {
     if (arg === "--with-build") options.withBuild = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--refresh-baseline") options.refresh = true;
+    else if (arg === "--baseline-only") options.baselineOnly = true;
     else if (arg === "--list-gates") options.listGates = true;
     else if (arg === "--scope") options.scope = (argv[i + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     else if (arg === "--scope-from") options.scopeFrom = argv[i + 1] ?? null;
+  }
+  if (options.baselineOnly && (!options.refresh || options.scopeFrom || options.withBuild)) {
+    throw new Error("--baseline-only membutuhkan --refresh-baseline, tanpa --scope-from atau --with-build; pengukuran bukan acceptance");
   }
 }
 
@@ -66,6 +71,7 @@ function run(command, args) {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
     error: result.error ?? null,
+    signal: result.signal ?? null,
   };
 }
 
@@ -111,16 +117,26 @@ function manifest() {
 
 /** File yang berubah relatif ke HEAD, termasuk yang belum di-track dan yang dihapus. */
 function changedFiles() {
-  const status = git(["status", "--porcelain=v1", "-uall"]);
-  if (status.status !== 0) return [];
-  return status.stdout
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const body = line.slice(3);
-      const renamed = body.split(" -> ");
-      return renamed[renamed.length - 1].replace(/^"|"$/g, "");
-    });
+  const status = git(["status", "--porcelain=v1", "-z", "-uall"]);
+  if (status.status !== 0 || status.error || status.signal) {
+    return { files: [], error: `git status gagal (exit ${status.status}); daftar perubahan tidak dapat diperiksa` };
+  }
+  // NUL records preserve spaces, quotes and Unicode. Renames modify both old and new paths.
+  const records = status.stdout.split("\0");
+  const files = new Set();
+  for (let i = 0; i < records.length; i += 1) {
+    const record = records[i];
+    if (!record) continue;
+    if (record.length < 4 || record[2] !== " ") return { files: [], error: "keluaran git status tidak valid" };
+    const state = record.slice(0, 2);
+    files.add(record.slice(3));
+    if (/[RC]/.test(state)) {
+      const original = records[++i];
+      if (!original) return { files: [], error: "keluaran rename/copy git status tidak lengkap" };
+      if (state.includes("R")) files.add(original);
+    }
+  }
+  return { files: [...files], error: null };
 }
 
 function matchesAny(file, patterns) {
@@ -225,7 +241,7 @@ function parseLintSummary(output) {
 
 /** Error per file dari blok stylish: baris path absolut diikuti baris "12:3  error  pesan". */
 function parseLintPerFile(output) {
-  const counts = {};
+  const counts = Object.create(null);
   let current = null;
   for (const line of output.split("\n")) {
     if (line.startsWith("/")) {
@@ -250,39 +266,39 @@ function parseLintPerFile(output) {
  * keluaran JSON dari linter itu, atau `exit-only` kalau rincian per file tidak dibutuhkan.
  */
 
-/** eslint --format json: array hasil per file. */
+/** eslint --format json: parse the whole report after known npm banners, never guessed substrings. */
 function parseLintJson(candidates) {
+  let invalid = false;
   for (const raw of candidates) {
     if (!raw) continue;
-    const start = raw.indexOf("[");
-    if (start === -1) continue;
-    // Kandidat akhir: sampai ujung keluaran, atau sampai bracket penutup terakhir.
-    // Diperlukan karena stderr bisa ditempel setelah JSON (mis. baris "npm notice").
-    for (const end of [raw.length, raw.lastIndexOf("]") + 1]) {
-      if (end <= start) continue;
-      try {
-        const data = JSON.parse(raw.slice(start, end));
-        if (!Array.isArray(data)) continue;
-        const files = {};
-        let errors = 0;
-        let warnings = 0;
-        for (const item of data) {
-          const errorsHere = Number(item?.errorCount ?? 0);
-          const warningsHere = Number(item?.warningCount ?? 0);
-          errors += errorsHere;
-          warnings += warningsHere;
-          if (errorsHere > 0 && typeof item?.filePath === "string") {
-            const file = path.relative(ROOT, item.filePath);
-            files[file] = (files[file] ?? 0) + errorsHere;
-          }
-        }
-        return { errors, warnings, files };
-      } catch {
-        // coba kandidat berikutnya
+    const report = raw.split(/\r?\n/)
+      .filter((line) => !/^npm notice(?:\s|$)/.test(line) && !/^>/.test(line))
+      .join("\n").trim();
+    if (!report) continue;
+    let data;
+    try { data = JSON.parse(report); }
+    catch {
+      if (/^(?:[\[\{"-]|\d|true(?:\s|$)|false(?:\s|$)|null(?:\s|$))/.test(report)) invalid = true;
+      continue;
+    }
+    if (!Array.isArray(data) || data.some((item) =>
+      !item || typeof item.filePath !== "string" || !item.filePath ||
+      !Number.isSafeInteger(item.errorCount) || item.errorCount < 0 ||
+      !Number.isSafeInteger(item.warningCount) || item.warningCount < 0)) { invalid = true; continue; }
+    const files = Object.create(null);
+    let errors = 0;
+    let warnings = 0;
+    for (const item of data) {
+      errors += item.errorCount;
+      warnings += item.warningCount;
+      if (item.errorCount > 0) {
+        const file = path.relative(ROOT, item.filePath);
+        files[file] = (files[file] ?? 0) + item.errorCount;
       }
     }
+    return { errors, warnings, files };
   }
-  return null;
+  return invalid ? { ...emptyParse("invalid"), invalid: true } : null;
 }
 
 async function parseLintCustom(output, parserPath) {
@@ -291,12 +307,13 @@ async function parseLintCustom(output, parserPath) {
     const parse = module.default ?? module.parse;
     if (typeof parse !== "function") return null;
     const result = parse(output, { root: ROOT, relative: (p) => path.relative(ROOT, p) });
-    if (!result || typeof result !== "object") return null;
-    return {
-      errors: Number(result.errors ?? 0),
-      warnings: Number(result.warnings ?? 0),
-      files: result.files ?? {},
-    };
+    if (!result || typeof result !== "object" ||
+      !Number.isSafeInteger(result.errors) || result.errors < 0 ||
+      !Number.isSafeInteger(result.warnings) || result.warnings < 0 ||
+      !result.files || typeof result.files !== "object" || Array.isArray(result.files) ||
+      Object.values(result.files).some((count) => !Number.isSafeInteger(count) || count < 0)) return null;
+    if (Object.values(result.files).reduce((sum, count) => sum + count, 0) !== result.errors) return emptyParse("invalid");
+    return { errors: result.errors, warnings: result.warnings, files: result.files };
   } catch {
     return null;
   }
@@ -308,7 +325,7 @@ function emptyParse(mode) {
 
 /** Buang file yang tidak relevan (mis. artefak workflow atau clone paket) dari perbandingan per file. */
 function filterIgnoredFiles(parsed, ignorePatterns) {
-  const kept = {};
+  const kept = Object.create(null);
   let ignored = 0;
   for (const [file, count] of Object.entries(parsed.files ?? {})) {
     if (matchesAny(file, ignorePatterns)) ignored += 1;
@@ -328,12 +345,11 @@ async function parseLint(output, config, stdout) {
     const summary = parseLintSummary(output);
     const files = parseLintPerFile(output);
     if (summary === null && Object.keys(files).length === 0) return null;
-    return {
-      mode: "eslint-stylish",
-      errors: summary?.errors ?? null,
-      warnings: summary?.warnings ?? null,
-      files,
-    };
+    const perFileTotal = Object.values(files).reduce((sum, count) => sum + count, 0);
+    if (!summary || summary.problems !== summary.errors + summary.warnings || perFileTotal !== summary.errors) {
+      return emptyParse("invalid");
+    }
+    return { mode: "eslint-stylish", errors: summary.errors, warnings: summary.warnings, files };
   };
 
   if (strategy === "exit-only") return emptyParse("exit-only");
@@ -374,12 +390,13 @@ async function main() {
 
   const branch = git(["branch", "--show-current"]).stdout.trim() || "(tanpa branch)";
   const head = git(["rev-parse", "--short", "HEAD"]).stdout.trim();
-  const changed = changedFiles();
+  const inspection = changedFiles();
+  const changed = inspection.files;
 
   const declaredGates = Object.entries(config.commands ?? {}).map(([name, command]) => ({
     name,
     command,
-    enabled: Boolean(command) && (name !== "build" || options.withBuild),
+    enabled: Boolean(command) && (!options.baselineOnly || name === "lint") && (name !== "build" || options.withBuild),
   }));
 
   if (options.listGates) {
@@ -397,6 +414,9 @@ async function main() {
   const always = config.scope?.always ?? [];
   if (scope.length === 0) {
     gates.push({ name: "scope", status: "skip", detail: "tidak ada scope yang diberikan" });
+  } else if (inspection.error) {
+    gates.push({ name: "scope", status: "fail", detail: inspection.error });
+    problems.push("scope");
   } else {
     const outside = changed.filter((file) => !matchesAny(file, scope) && !matchesAny(file, always));
     if (outside.length === 0) {
@@ -408,18 +428,24 @@ async function main() {
   }
 
   // 2. Bersihkan artefak build sebelum gate yang membaca tipe.
-  cleanup(config.cleanupPaths ?? [], notes);
+  if (!options.baselineOnly) cleanup(config.cleanupPaths ?? [], notes);
 
   // 3. Format
   const formatIgnore = config.format?.ignore ?? [".pi/**"];
-  const formatResult = formatGate(changed, config, formatIgnore);
+  const formatResult = options.baselineOnly
+    ? { status: "skip", detail: "mode pengukuran baseline; bukan verifikasi format" }
+    : inspection.error && config.commands?.format
+      ? { status: "fail", detail: inspection.error }
+      : formatGate(changed, config, formatIgnore);
   gates.push({ name: "format", ...formatResult });
   if (formatResult.status === "fail") problems.push("format");
   for (const note of formatResult.notes ?? []) notes.push(note);
 
   // 4. Typecheck
   const typecheck = config.commands?.typecheck;
-  if (!typecheck) {
+  if (options.baselineOnly) {
+    gates.push({ name: "typecheck", status: "skip", detail: "mode pengukuran baseline; bukan verifikasi tipe" });
+  } else if (!typecheck) {
     gates.push({ name: "typecheck", status: "skip", detail: "perintah belum dideklarasikan di manifest" });
   } else {
     const result = run(typecheck.split(" ")[0], typecheck.split(" ").slice(1));
@@ -472,28 +498,28 @@ async function main() {
       head,
     };
 
-    if (parsed.mode === "none") {
+    const eslintFatal = ["eslint-json", "eslint-stylish"].includes(parsed.mode) && result.status > 1;
+    const invalidExit = result.status !== 0 && (parsed.mode === "none" || parsed.mode === "exit-only" || parsed.errors === 0);
+    const invalidReport = parsed.mode === "invalid" ||
+      (parsed.mode === "none" && !["auto", "exit-only"].includes(config.lint?.parser ?? "auto"));
+    if (result.error || result.signal || eslintFatal || invalidExit || invalidReport) {
+      gates.push({ name: "lint", status: "fail", detail: `linter gagal dijalankan atau laporan tidak valid (exit ${result.status}); bukan baseline error lama`, parser: parsed.mode });
+      lintBaseline = null;
+      problems.push("lint");
+    } else if (parsed.mode === "none" || parsed.mode === "exit-only") {
+      // Exit 0 proves execution success, not readable per-file evidence or a measurable baseline.
+      const status = options.refresh ? "fail" : parsed.mode === "none" ? "warn" : "pass";
       gates.push({
-        name: "lint",
-        status: result.status === 0 ? "pass" : "warn",
-        detail: `hasil tidak terbaca (exit ${result.status}); set lint.parser: auto | eslint-json | eslint-stylish | exit-only | custom`,
+        name: "lint", status,
+        detail: parsed.mode === "none"
+          ? "hasil tidak terbaca (exit 0); set lint.parser: auto | eslint-json | eslint-stylish | exit-only | custom"
+          : "exit 0; perbandingan per file tidak tersedia; baseline tidak dapat diukur",
         parser: parsed.mode,
       });
-    } else if (parsed.mode === "exit-only") {
-      const status = result.status === 0 ? "pass" : "warn";
-      gates.push({
-        name: "lint",
-        status,
-        detail: `exit ${result.status}; perbandingan per file tidak tersedia${parserNote}`,
-        parser: parsed.mode,
-      });
-      lintBaseline = {
-        errors: Number(baseline.errors ?? 0),
-        warnings: Number(baseline.warnings ?? 0),
-        files: perFile,
-        measuredAt: new Date().toISOString().slice(0, 10),
-        head,
-      };
+      lintBaseline = null;
+      if (status === "fail") problems.push("lint");
+    } else if (summary?.errors === 0 && summary.warnings === 0 && result.status === 0) {
+      gates.push({ name: "lint", status: "pass", detail: `0 error, 0 warning${ignoredNote}`, parser: parsed.mode });
     } else if (baseline.errors === null && Object.keys(baseline.files).length === 0) {
       // Baseline belum pernah diukur: belum ada pembanding, jadi tidak boleh disebut regresi.
       const total = summary ? `${summary.errors} error, ${summary.warnings} warning` : "tidak terbaca";
@@ -527,9 +553,16 @@ async function main() {
     }
   }
 
+  if (options.refresh && !lint) {
+    Object.assign(gates.find((gate) => gate.name === "lint"), { status: "fail", detail: "baseline tidak dapat diukur tanpa perintah lint; tunda pengukuran sampai toolchain tersedia" });
+    problems.push("lint");
+  }
+
   // 6. Test (opsional)
   const test = config.commands?.test;
-  if (!test) {
+  if (options.baselineOnly) {
+    gates.push({ name: "test", status: "skip", detail: "mode pengukuran baseline; bukan verifikasi test" });
+  } else if (!test) {
     gates.push({ name: "test", status: "skip", detail: "project ini belum punya gate test" });
   } else {
     const result = run(test.split(" ")[0], test.split(" ").slice(1));
@@ -542,7 +575,9 @@ async function main() {
 
   // 7. Build (hanya dengan --with-build)
   const build = config.commands?.build;
-  if (!build) {
+  if (options.baselineOnly) {
+    gates.push({ name: "build", status: "skip", detail: "mode pengukuran baseline; bukan verifikasi build" });
+  } else if (!build) {
     gates.push({ name: "build", status: "skip", detail: "perintah belum dideklarasikan di manifest" });
   } else if (!options.withBuild) {
     gates.push({ name: "build", status: "skip", detail: "dilewati, jalankan dengan --with-build" });
@@ -567,7 +602,8 @@ async function main() {
   // tetap terlihat dan tidak langsung dianggap normal.
   const history = Array.isArray(previous.baselineHistory) ? previous.baselineHistory.slice(-19) : [];
   let baselineDelta = null;
-  if (options.refresh && lintBaseline && baselineBisaDipercaya) {
+  const baselineUpdated = Boolean(options.refresh && lintBaseline && baselineBisaDipercaya && !problems.includes("scope"));
+  if (baselineUpdated) {
     const before = previous.baseline ?? null;
     if (before && typeof before.errors === "number") {
       baselineDelta = { errors: lintBaseline.errors - before.errors, from: before.head ?? null, to: head };
@@ -589,12 +625,15 @@ async function main() {
       );
     }
   } else if (options.refresh) {
-    notes.push("baseline tidak diperbarui: hasil lint belum bisa dibaca");
+    notes.push(problems.includes("scope")
+      ? "baseline tidak diperbarui: scope tidak dapat diverifikasi"
+      : "baseline tidak diperbarui: hasil lint tidak tersedia atau tidak dapat dipercaya");
   }
 
   const next = {
     ...previous,
     projectName: config.projectName,
+    mode: options.baselineOnly ? "baseline" : "verify",
     head,
     scope,
     gates,
@@ -603,7 +642,7 @@ async function main() {
     ...(baselineDelta ? { baselineDelta } : {}),
     ...(history.length > 0 ? { baselineHistory: history } : {}),
   };
-  if (options.refresh && lintBaseline && baselineBisaDipercaya) next.baseline = lintBaseline;
+  if (baselineUpdated) next.baseline = lintBaseline;
   fs.writeFileSync(RESULT_PATH, `${JSON.stringify(next, null, 2)}\n`);
 
   // Write the result back into the run artefact that supplied the scope, so one task leaves one trail.
@@ -628,7 +667,7 @@ async function main() {
   }
 
   if (options.json) {
-    console.log(JSON.stringify({ ok, head, scope, gates, baseline: next.baseline ?? null, baselineDelta }, null, 2));
+    console.log(JSON.stringify({ ok, mode: next.mode, head, scope, gates, baseline: next.baseline ?? null, baselineUpdated, baselineDelta }, null, 2));
   } else {
     const lines = [`== ${config.projectName} (HEAD ${head}, branch ${branch}) ==`];
     for (const gate of gates) {
@@ -637,8 +676,12 @@ async function main() {
     }
     for (const note of notes) lines.push(`  catatan: ${note}`);
     lines.push("");
-    lines.push(ok ? "  hijau, tidak ada regresi" : `  PERLU DIPERBAIKI: ${problems.join(", ")}`);
-    if (options.refresh) lines.push("  baseline diperbarui di verification.json");
+    lines.push(ok
+      ? options.baselineOnly ? "  pengukuran baseline selesai; bukan acceptance"
+        : gates.some((gate) => gate.status === "warn") ? "  verifikasi selesai dengan catatan; tinjau WARN di atas"
+          : "  hijau, tidak ada regresi"
+      : `  PERLU DIPERBAIKI: ${problems.join(", ")}`);
+    if (baselineUpdated) lines.push("  baseline diperbarui di verification.json");
     if (baselineDelta) {
       const arah =
         baselineDelta.errors === 0

@@ -37,7 +37,10 @@ sebutkan di ringkasan, tapi tidak perlu menunggu keputusan.
 3. Perbarui `deviations.md` kalau ada deviasi yang dicabut atau ditambah. Setiap perubahan deviasi butuh
    keputusan user, bukan kesimpulan sendiri.
 4. Perbarui `provenance.json` dengan menjalankan `node .pi/stapler/provenance.mjs`, jangan menghitung hash secara manual. `compiledInto` yang sudah ada akan dipertahankan.
-5. Perbarui angka terukur lewat verifier `--refresh-baseline`, jangan menulis angka baseline secara manual.
+5. Perbarui angka terukur lewat verifier `--refresh-baseline --baseline-only`, jangan menulis angka
+   baseline secara manual. Ini pengukuran lint, bukan acceptance; verifikasi penuh dilakukan terpisah.
+   Jika toolchain belum tersedia atau laporan gagal dibaca, baseline tidak diperbarui dan kegagalan
+   dilaporkan, bukan diisi nol.
 
 ## 4. Verifikasi
 

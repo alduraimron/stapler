@@ -161,6 +161,11 @@ ulangi langkah 2 untuk bagian yang berubah saja.
 - Jika `delegate` mendukung `implementer`/`runPath` dan user tidak meminta tanpa implementer, gunakan
   profil `implement-approved` sebagai default setelah ACC dan run ditulis. Kirim path run, pack/checklist
   aturan, dan tujuan bounded; scope/acceptance dimuat Slaver dari run, bukan diganti lewat teks task.
+  Jika cwd sesi berbeda dari root project dan schema menyediakan `workspacePath`, pilih path absolut
+  canonical yang di-ACC dan isi `workspaceRoot` pada run dengan root itu; runPath/pack/scope milik root
+  terpilih. Jangan menggunakan host SDK ad hoc atau symlink untuk menghindari boundary. Tanpa dukungan
+  workspace, minta user membuka Pi dari root project. ParentId/status tetap di sesi asal; progress
+  hanyalah metadata, bukan acceptance.
   Jangan memperbarui run atau menjalankan verifier selama child aktif; catat outcome setelah terminal.
 - Child hanya punya `scoped_edit`/`scoped_write` untuk file tepat dalam scope. Pack/run/ADR/harness tetap
   milik parent; scope direktori, protected files, symlink atau hardlink harus dilaporkan sebagai blocker,

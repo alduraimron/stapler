@@ -197,7 +197,7 @@ Catatan field:
   file itu sudah gagal sebelum perubahan ini. Kosongkan kalau formatter tidak mendukung cara ini.
 - `lint.parser`: cara membaca keluaran linter. `auto` (default) mencoba JSON lalu teks stylish; pilihan lain
   `eslint-json`, `eslint-stylish`, `exit-only`, dan `custom`. `exit-only` tidak bisa mendeteksi regresi per
-  file, jadi hasilnya hanya `pass` atau `warn`, tidak pernah `fail` karena isi.
+  file: exit 0 lulus dengan batasan itu, sedangkan exit nonzero gagal tanpa mengarang perbandingan baseline.
 - `lint.ignoreFiles`: path yang dibuang dari perbandingan per file, default `.pi/**`. Berguna karena linter
   sering ikut memeriksa artefak workflow atau clone paket yang berada di dalam project.
 - `lint.parserPath`: dipakai saat `lint.parser` bernilai `custom`. Modulnya wajib punya default export
@@ -285,11 +285,15 @@ selain temuan biasa, ia mencetak daftar perintah konkret (`npm install`, `npm ru
 ## 13. Kontrak verifier
 
 ```text
-node .pi/stapler/verification.mjs [--scope <path,...>] [--scope-from <file>] [--with-build] [--json] [--refresh-baseline] [--list-gates]
+node .pi/stapler/verification.mjs [--scope <path,...>] [--scope-from <file>] [--with-build] [--json] [--refresh-baseline] [--baseline-only] [--list-gates]
 ```
 
-- Exit `0`: semua gate hijau, atau merah yang terbukti sudah ada sebelum perubahan ini.
-- Exit `1`: ada regresi, atau ada file berubah di luar scope.
+- Exit `0`: pemeriksaan berhasil, termasuk catatan error lint lama yang terbukti dari baseline. WARN
+  tetap ditampilkan sebagai catatan, bukan klaim semua gate hijau.
+- Exit `1`: regresi, file di luar scope, Git tidak bisa memeriksa scope, atau kegagalan menjalankan gate.
+- `--baseline-only` wajib bersama `--refresh-baseline`: hanya ukur lint dan scope opsional; format,
+  typecheck, test, build dan cleanup tidak dijalankan. Ini pengukuran, bukan acceptance. Tidak boleh
+  digabung `--scope-from` atau `--with-build`, agar hasil pengukuran tidak menimpa verifikasi task.
 - `--json`: keluaran mesin, bentuknya:
 
 ```json
@@ -305,6 +309,9 @@ node .pi/stapler/verification.mjs [--scope <path,...>] [--scope-from <file>] [--
 Aturan gate:
 
 1. Gate `scope` gagal kalau ada file berubah di luar `--scope`, kecuali cocok dengan `scope.always`.
+   Kegagalan Git tidak boleh dianggap daftar perubahan kosong: scope dan format yang membutuhkan
+   daftar perubahan harus dilaporkan tidak dapat diperiksa, bukan PASS. Repo baru tanpa commit tetap
+   bisa diperiksa dengan git status; tidak memiliki HEAD berbeda dari bukan repo Git.
 2. Gate `lint` dibandingkan **per file**, bukan hanya total. Error baru di file yang termasuk scope selalu
    dianggap regresi, walau totalnya turun karena error lama hilang di file lain.
 3. Baseline yang belum pernah diukur tidak pernah dianggap regresi: gate dilaporkan `warn` dengan saran
@@ -312,8 +319,11 @@ Aturan gate:
    tidak ada dasar untuk menyebutnya regresi.
 4. Error di file yang sudah pernah gagal sebelum perubahan dilaporkan sebagai `warn`, bukan `fail`.
 5. Gate yang `null` di manifest dilaporkan `skip` beserta alasannya.
-6. `--refresh-baseline` hanya menulis `verification.json`, tidak pernah menggagalkan gate. Baseline **tidak**
-   ditulis kalau hasil linter tidak terbaca, karena baseline berisi nol akan menyesatkan pemeriksaan berikutnya.
+6. `--refresh-baseline` mencatat hasil lint terukur ke `verification.json`; tanpa `--baseline-only`, gate
+   verifikasi lain tetap dijalankan dan dapat gagal. Baseline **tidak** ditulis saat scope gagal,
+   linter gagal dijalankan, exit infrastruktur, atau hasil tidak terbaca. Pesan pembaruan hanya dicetak
+   bila baseline benar-benar ditulis. Untuk project kosong, tunda baseline sampai konfigurasi dan
+   dependency tersedia; jangan mengarang nol atau melemahkan gate untuk bootstrap.
 7. Gate `format` melewati `format.ignore`, dan gate `scope` mengabaikan `scope.always`, sehingga hasil
    verifier sendiri tidak pernah dianggap perubahan.
 8. Gate `format` memakai `commands.format` dari manifest sebagai awalan perintah, lalu dijalankan per file:
@@ -323,6 +333,12 @@ Aturan gate:
    formatter. Untuk prettier: `npx prettier --stdin-filepath`; isi file dari HEAD dikirim ke stdin dan
    keluarannya dibandingkan dengan isi itu. Tanpa `headProbe`, file yang gagal dilaporkan sebagai regresi
    beserta saran menambahkannya ke `format.ignore`.
+10. Lint exit 2/infrastruktur tidak boleh dianggap error lama; exit nonzero tanpa laporan yang valid
+    selalu gagal. Exit 1 dengan laporan ESLint berisi error tetap dapat dibandingkan per file terhadap
+    baseline. Lint terukur 0 error/0 warning dengan exit 0 dinyatakan PASS, bukan WARN.
+11. Laporan terstruktur harus utuh: JSON adalah array report top-level, bukan array bersarang pada
+    object/messages; jumlah error stylish/custom harus cocok dengan rincian per-file sebelum ignore.
+    Laporan invalid/incomplete gagal dan tidak boleh menghasilkan baseline nol.
 
 ### Dukungan linter
 
@@ -333,7 +349,7 @@ teks stylish. Untuk linter lain, dua jalur yang disarankan:
 | --- | --- |
 | ESLint | `lint.parser: "eslint-json"` dengan perintah `npm run lint -- --format json`; ini yang paling tahan lama |
 | Biome, Ruff, golangci-lint, lainnya | keluarkan JSON dari linter itu, lalu tulis parser `custom` yang membaca bentuk JSON tersebut |
-| Linter apa pun tanpa rincian per file | `lint.parser: "exit-only"`; gate tidak akan pernah gagal karena isi, hanya melaporkan exit code |
+| Linter apa pun tanpa rincian per file | `lint.parser: "exit-only"`; exit nonzero gagal, exit 0 lulus tanpa klaim regresi per file |
 
 Konsekuensinya harus dinyatakan jujur di laporan `init`: selama parser masih `exit-only`, klaim "tidak ada
 regresi lint" tidak bisa dibuktikan, dan itu ditulis sebagai batasan, bukan sebagai hijau.
@@ -421,6 +437,10 @@ Setiap task menulis satu file `runs/<tanggal>-<slug>.json` sebelum kode diubah:
 Slaver membantu recon/inspeksi, review read-only, dan (V1) implementasi scoped setelah ACC melalui
 `delegate`. Profil task dan protokolnya ada di [slaver.md](slaver.md); profil bukan mode proses baru atau
 play project. V1 menambah field API `runPath` hanya untuk implementer, bukan field `mode`.
+Field opsional `workspacePath` memilih root absolut yang sudah ada tanpa mengganti parentId. Untuk
+implementer lintas cwd, run wajib mengikat `workspaceRoot` ke path canonical root terpilih; scope tetap
+file tepat di dalam root itu. Default/legacy cwd tetap valid. Progress bounded bukan transcript atau
+hasil verifikasi; tidak ada host SDK tambahan atau izin menulis di luar root.
 
 - Consumer boleh mendelegasikan `impact`, `scope-review`, `change-review`, dan `implement-approved`.
   Aturan pack, precedence, `rawReads`, dan scope tetap mengikat child. Bacaan kelas C child ikut dilaporkan oleh parent.

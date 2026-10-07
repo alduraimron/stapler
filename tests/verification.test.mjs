@@ -240,24 +240,30 @@ test("parser custom dari project dipakai saat lint.parser bernilai custom", () =
   assert.match(lint.detail, /src\/app\.ts naik dari 0 ke 2/);
 });
 
-test("mode exit-only tidak pernah menggagalkan gate karena isi, dan menyebut batasannya", () => {
+test("mode exit-only menggagalkan exit nonzero tanpa mengarang baseline per file", () => {
   const dir = fixture({ lintFormat: "plain", lintConfig: { parser: "exit-only" } });
   verify(dir, ["--refresh-baseline", "--scope", "src/app.ts"]);
   fs.writeFileSync(path.join(dir, ".pi/stapler/fake-lint.json"), JSON.stringify({ "src/app.ts": 5 }));
   const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
-  assert.equal(code, 0);
-  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  const lint = parsed.gates.find((gate) => gate.name === "lint");
+  assert.equal(parsed.ok, false);
+  assert.equal(lint.status, "fail");
   assert.equal(lint.parser, "exit-only");
-  assert.match(lint.detail, /perbandingan per file tidak tersedia/);
+  assert.match(lint.detail, /exit 1/);
 });
 
-test("parse yang tidak dikenali dilaporkan sebagai keterbatasan, bukan hijau", () => {
+test("linter gagal dengan output tidak terbaca tidak pernah dianggap hijau", () => {
   const dir = fixture({ lintFormat: "plain", lintConfig: { parser: "eslint-stylish" } });
   const { code, out } = verify(dir, ["--scope", "src/app.ts", "--json"]);
-  assert.equal(code, 0);
-  const lint = JSON.parse(out).gates.find((gate) => gate.name === "lint");
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  const lint = parsed.gates.find((gate) => gate.name === "lint");
+  assert.equal(parsed.ok, false);
+  assert.equal(lint.status, "fail");
   assert.equal(lint.parser, "none");
-  assert.match(lint.detail, /hasil tidak terbaca.*set lint\.parser/);
+  assert.match(lint.detail, /linter gagal.*exit 1/);
 });
 
 test("JSON lint tetap terbaca walau stderr ditempel di belakangnya", () => {

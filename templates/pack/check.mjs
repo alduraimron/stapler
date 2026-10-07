@@ -208,7 +208,10 @@ function main() {
       }
     }
   } else {
-    notes.push("bukan repo git: pemeriksaan HEAD dilewati");
+    const repository = git(["rev-parse", "--is-inside-work-tree"]);
+    notes.push(repository.ok && repository.out === "true"
+      ? "repo Git belum memiliki HEAD; pemeriksaan riwayat dilewati, git status tetap bisa memeriksa scope"
+      : "Git/working tree tidak tersedia; pemeriksaan HEAD dilewati, verifier tidak boleh menganggap scope lulus");
   }
 
   const wajib = findings.filter((finding) => finding.code !== "WARN");

@@ -44,6 +44,8 @@ meminta kerja tanpa implementer. Ketiadaan role ini tidak menghalangi integrasi 
 
 Untuk scout/reviewer, gunakan hanya `agent`, `task`, `context`, `constraints`, dan `expectedOutput`.
 V1 menambah `runPath` yang wajib hanya untuk implementer; jangan kirim field itu ke role read-only.
+Jika schema menyediakan `workspacePath`, field opsional itu memilih directory project absolut yang sudah
+ada untuk role mana pun. Default tetap cwd host. Jangan memakai teks task sebagai override workspace.
 Sebelum memanggil, ganti placeholder dengan fakta task yang sudah diperiksa:
 
 ```json
@@ -113,6 +115,18 @@ atau membuktikan persetujuan user dari percakapan. Gate pack dan ACC di Stapler 
   "expectedOutput": "File yang berubah, apa yang dikerjakan, blocker, dan langkah verifikasi/manual yang belum dijalankan. Jangan klaim acceptance/gate lulus."
 }
 ```
+
+Jika root project berbeda dari cwd sesi, gunakan `workspacePath` hanya bila schema tool mendukungnya.
+Setelah ACC untuk root itu, parent menulis `workspaceRoot` dalam run, sama persis dengan path canonical
+root terpilih. `runPath` tetap relatif terhadap root tersebut, dan check/pack/scope harus berasal dari
+project itu. Binding hilang/salah gagal sebelum child dibuat; jangan menyalin run ke project lain atau
+menggunakan symlink/traversal untuk melewati guard. Run lama tetap valid tanpa binding untuk cwd yang sama.
+Jika field workspace belum tersedia, minta user membuka Pi dari root project, bukan membuat host SDK
+ad hoc, melonggarkan scope atau fallback menulis tanpa handoff yang benar. ParentId tetap sesi asal;
+status dan cancel bisa dipantau di /subagents tanpa memindahkan transcript atau session.
+
+Progress yang muncul adalah metadata bounded (id, role, status, waktu, jumlah/nama tool), bukan isi hasil
+atau stream reasoning child. Progress tidak membuktikan edit berhasil atau acceptance lulus.
 
 Run harus memakai path file literal, bukan direktori/pola. Slaver membekukan scope/acceptance dan hash run,
 menolak traversal, symlink/hardlink dan protected files, serta memeriksa readiness guard sebelum prompt.

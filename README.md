@@ -66,6 +66,17 @@ node .pi/stapler/verification.mjs --scope-from .pi/stapler/runs/<file run>.json
 Scope dibaca dari artefak run yang berisi daftar file yang disetujui, dan hasil verifikasi ditulis balik ke
 artefak itu. Angka baseline punya riwayat, jadi kenaikan error setelah pull tetap terlihat.
 
+Pengukuran baseline terpisah dari acceptance:
+
+```bash
+node .pi/stapler/verification.mjs --refresh-baseline --baseline-only
+```
+
+Mode ini hanya mengukur lint, tidak menjalankan format/typecheck/test/build/cleanup dan tidak boleh
+menimpa hasil run dengan `--scope-from`. Untuk project kosong, tunda baseline sampai toolchain tersedia;
+jangan mengarang nol. Git gagal memeriksa perubahan atau linter gagal menjalankan pemeriksaan sekarang
+menggagalkan verifikasi, bukan dianggap scope kosong atau baseline lama.
+
 ## Slaver (opsional)
 
 Stapler memakai tool `delegate` dari [Slaver](https://github.com/alduraimron/slaver) jika tersedia. Tidak
@@ -92,7 +103,10 @@ Jalankan `/reload` atau restart Pi setelah memperbarui paket/skill. Perintah Sta
   menulis otomatis. Pembatalan menunggu arahan user. Hasil child bukan bukti gate hijau.
 
 Profil dikirim lewat `task`, `context`, `constraints`, dan `expectedOutput`, bukan parameter API `mode`.
-V1 menambah `runPath` hanya untuk implementer. Jejaknya dicatat setelah ACC pada field opsional
+V1 menambah `runPath` hanya untuk implementer. Dengan `workspacePath`, project di luar cwd sesi bisa
+dipilih eksplisit tanpa host SDK kedua; implementer lintas cwd wajib memiliki binding `workspaceRoot`
+pada run. Scope tetap file tepat di root itu, dan /subagents/cancel milik sesi asal. Progress hanya
+metadata ringkas, bukan transcript atau bukti acceptance. Jejaknya dicatat setelah ACC pada field opsional
 `delegations` di run; jangan menulis metadata run selama child aktif. Pack/run lama tetap kompatibel.
 Pantau session dengan `/subagents` atau `/subagents <id>`. Implementer tersedia di `main` Slaver tanpa
 bump versi paket; V1 adalah nama kontrak kapabilitas, bukan nomor rilis. Update pemasangan Git tanpa pin

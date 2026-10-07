@@ -74,23 +74,32 @@ Setiap file GENERATED diawali banner: pembuat, versi skill, waktu, dan daftar su
 
 ## 5. Ukur baseline
 
-Jalankan gate yang tersedia dengan `--refresh-baseline`, seadanya dulu:
+Pisahkan pengukuran lint dari verifikasi penuh:
 
-1. Sekali untuk melihat kondisi awal. Merah sebelum perubahan bukan kegagalan `init`; catat apa adanya.
-2. Tulis angka baseline lint dan HEAD ke `verification.json` dan salin ke `manifest.json`.
-3. Kalau gate `lint` merah karena file yang sudah ada sebelumnya, jangan diperbaiki. Catat di laporan
-   sebagai kondisi awal, dan pastikan baseline-nya tercatat supaya tidak dianggap regresi nanti.
+1. Jika konfigurasi/dependency lint tersedia, jalankan
+   `node .pi/stapler/verification.mjs --refresh-baseline --baseline-only`.
+   Mode ini tidak menjalankan format/typecheck/test/build atau cleanup; keberhasilannya bukan acceptance.
+2. Salin baseline terukur dari `verification.json` ke `manifest.json` hanya jika benar-benar ditulis.
+   Error lint lama yang terbaca boleh menjadi kondisi awal; kegagalan menjalankan linter tidak boleh
+   menjadi baseline nol. Exit/error/peringatan dicatat apa adanya.
+3. Untuk project greenfield yang masih kosong atau dependency belum tersedia, tunda baseline dengan
+   nilai `null` dan alasan yang eksplisit. Jangan mengarang nol, menjalankan gate yang belum tersedia
+   berulang kali, atau mengubah commands menjadi null hanya supaya hijau. Sesudah konfigurasi/code
+   dibuat dalam scope task yang di-ACC dan dependency dipasang parent, ukur baseline lalu verifikasi penuh.
+4. Scope membutuhkan Git yang bisa menjalankan status. Jika repo belum ada, usulkan Git init tanpa
+   commit dan lakukan hanya setelah user mengizinkan. Repo tanpa commit tetap valid untuk gate scope.
 
-Gate build dijalankan hanya kalau user setuju, karena lambat.
+Verifikasi penuh dan build dijalankan terpisah ketika prasyarat tersedia dan user setuju.
 
 ## 6. Verifikasi hasil
 
 1. Jalankan `node .pi/stapler/check.mjs` sampai bersih, kecuali temuan yang memang belum bisa ditutup. Sisa temuan dilaporkan.
-2. Jalankan verifier sekali dengan `--scope` kosong untuk memastikan kontraknya jalan, dan laporkan exit
-   code-nya.
-3. Uji negatif yang murah: pastikan gate `scope` benar-benar bisa gagal. Cara aman: jalankan verifier dengan
-   `--scope` yang menunjuk satu file yang tidak berubah, lalu pastikan hasilnya sesuai harapan, tanpa
-   mengubah file apa pun.
+2. Saat prasyarat gate tersedia, jalankan verifier normal sekali dengan `--scope` kosong dan laporkan
+   hasilnya. Jika belum tersedia pada project kosong, nyatakan verifikasi aplikasi ditunda; check pack
+   bukan bukti acceptance aplikasi.
+3. Uji negatif scope saat ada perubahan aplikasi yang bisa diamati: jalankan verifier dengan scope
+   yang sengaja tidak mencakup perubahan itu, lalu pastikan exit 1. Jika semua perubahan hanya artefak
+   workflow yang diabaikan, nyatakan probe ditunda; jangan mengklaim scope pernah gagal.
 4. Setelah hasil kompilasi lolos check, gunakan `reviewer` profil `pack-audit` jika tersedia. Berikan
    pasangan sumber -> file pack, manifest/override yang di-ACC, dan hasil check. Tinjau larangan/perintah
    verbatim, makna aturan, dan deviasi, bukan hanya hash. Perbaiki temuan valid lewat kompilasi dalam scope

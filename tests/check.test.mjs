@@ -174,6 +174,17 @@ test("tanpa --post-pull, bagian drill tidak muncul", () => {
   assert.doesNotMatch(hasil.stdout, /drill pasca-pull/);
 });
 
+test("repo Git tanpa HEAD tidak disebut bukan repo Git", (t) => {
+  const { dir, run } = fixture();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.rmSync(path.join(dir, ".git"), { recursive: true, force: true });
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: dir }).status, 0);
+  const result = run("check.mjs");
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /repo Git belum memiliki HEAD/);
+  assert.doesNotMatch(result.stdout, /bukan repo git/);
+});
+
 test("provenance mempertahankan compiledInto dan menandai file manual", () => {
   const { dir, run } = fixture();
   const provenancePath = path.join(dir, ".pi/stapler/provenance.json");

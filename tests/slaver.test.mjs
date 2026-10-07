@@ -105,6 +105,15 @@ test("handoff implementer terjadi setelah ACC dan tidak memperbarui run selama c
   assert.match(CONTRACT, /enum agent belum memuat implementer[\s\S]*gunakan parent/);
 });
 
+test("workspace lintas cwd membutuhkan binding root dan tidak mendorong SDK ad hoc", () => {
+  const consumer = read(SKILLS[0]);
+  for (const token of ["workspacePath", "workspaceRoot", "canonical"]) assert.ok(consumer.includes(token));
+  assert.match(CONTRACT, /Binding hilang\/salah gagal sebelum child dibuat/);
+  assert.match(CONTRACT, /Run lama tetap valid tanpa binding untuk cwd yang sama/);
+  assert.match(CONTRACT, /host SDK[\s\S]*ad hoc/);
+  assert.match(CONTRACT, /Progress[\s\S]*bukan[\s\S]*reasoning child/);
+});
+
 test("run baru menyediakan jejak delegasi kosong tanpa mengarang hasil verifier", () => {
   const run = JSON.parse(read("templates/tasks/run-log.json"));
   assert.equal(run.schemaVersion, 1);
